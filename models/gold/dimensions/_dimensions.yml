@@ -1,0 +1,69 @@
+version: 2
+
+models:
+  - name: dim_customer
+    description: |
+      SCD2 customer dimension. customer_sk = surrogate per (customer_bk, validity period).
+      `is_current` flag identifies the most recent version per customer.
+    columns:
+      - name: customer_sk
+        tests: [not_null, unique]
+      - name: customer_bk
+        tests: [not_null]
+
+  - name: dim_product
+    description: "SCD2 product dimension with rolled-up category/subcategory."
+    columns:
+      - name: product_sk
+        tests: [not_null, unique]
+      - name: product_bk
+        tests: [not_null]
+
+  - name: dim_employee
+    description: "SCD2 employee dimension."
+    columns:
+      - name: employee_sk
+        tests: [not_null, unique]
+      - name: employee_bk
+        tests: [not_null]
+
+  - name: dim_salesterritory
+    description: "SCD2 sales territory dimension."
+    columns:
+      - name: sales_territory_sk
+        tests: [not_null, unique]
+      - name: sales_territory_bk
+        tests: [not_null]
+
+  - name: dim_date
+    description: "Conformed date dimension, 2010-01-01 → 2030-12-31. SCD0."
+    columns:
+      - name: date_sk
+        tests: [not_null, unique]
+      - name: full_date
+        tests: [not_null, unique]
+
+  - name: dim_special_offer
+    description: |
+      Promotion / discount dimension (NOT a junk dim — it has its own attributes
+      and discount_pct drives revenue measures).
+    columns:
+      - name: special_offer_sk
+        tests: [not_null, unique]
+      - name: special_offer_bk
+        tests: [not_null]
+      - name: discount_pct
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 1
+      - name: discount_tier
+        tests:
+          - accepted_values:
+              values: ['No Discount', 'Low (<5%)', 'Medium (5-15%)', 'High (15-30%)', 'Deep (30%+)']
+
+  - name: dim_sales_order_junk
+    description: "Junk dim collapsing 5 low-cardinality order flags into a single SK."
+    columns:
+      - name: sales_order_junk_sk
+        tests: [not_null, unique]

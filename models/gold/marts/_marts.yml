@@ -1,0 +1,18 @@
+version: 2
+
+models:
+  - name: mart_sales_summary
+    description: "Sales aggregated by territory + product category + month. BI-ready."
+    columns:
+      - name: gross_revenue
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+
+  - name: mart_employee_performance
+    description: "Sales-person performance vs. quota, with attainment ratio + quota_status."
+    columns:
+      - name: quota_status
+        tests:
+          - accepted_values:
+              values: ['Met', 'Near', 'Below', 'No Quota Set']

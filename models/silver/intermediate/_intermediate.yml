@@ -1,0 +1,39 @@
+version: 2
+
+models:
+  - name: int_customer_addresses
+    description: "Customer + primary address for dim_customer."
+    columns:
+      - name: customer_bk
+        tests: [not_null]
+
+  - name: int_product_enriched
+    description: "Product + subcategory + category, with status flag."
+    columns:
+      - name: product_bk
+        tests: [not_null, unique]
+
+  - name: int_employee_details
+    description: "Employee + person + current pay rate + current department."
+    columns:
+      - name: employee_bk
+        tests: [not_null, unique]
+
+  - name: int_territory_current
+    description: "SalesTerritory + current sales-person assignment."
+    columns:
+      - name: sales_territory_bk
+        tests: [not_null, unique]
+
+  - name: int_sales_order_flag_combinations
+    description: "Distinct combinations of low-cardinality order flags. Backs dim_sales_order_junk."
+
+  - name: int_sales_order_line_enriched
+    description: "Line + header attributes + allocated freight/tax."
+    columns:
+      - name: sales_order_line_bk
+        tests: [not_null, unique]
+      - name: sales_order_bk
+        tests: [not_null]
+      - name: customer_bk
+        tests: [not_null]

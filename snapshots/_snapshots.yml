@@ -1,0 +1,37 @@
+version: 2
+
+# Snapshot tests use the custom scd2_no_overlap test (see macros/test_scd2_no_overlap.sql)
+# and singular tests in tests/.
+
+snapshots:
+  - name: snap_customer
+    description: "SCD Type 2 — customer attribute history. Feeds dim_customer."
+    columns:
+      - name: customer_bk
+        tests: [not_null]
+      - name: dbt_scd_id
+        tests: [not_null, unique]
+
+  - name: snap_product
+    description: "SCD Type 2 — product price/category history. Feeds dim_product."
+    columns:
+      - name: product_bk
+        tests: [not_null]
+      - name: dbt_scd_id
+        tests: [not_null, unique]
+
+  - name: snap_employee
+    description: "SCD Type 2 — employee role/pay/department history. Feeds dim_employee."
+    columns:
+      - name: employee_bk
+        tests: [not_null]
+      - name: dbt_scd_id
+        tests: [not_null, unique]
+
+  - name: snap_salesterritory
+    description: "SCD Type 2 — territory ownership history. Feeds dim_salesterritory."
+    columns:
+      - name: sales_territory_bk
+        tests: [not_null]
+      - name: dbt_scd_id
+        tests: [not_null, unique]

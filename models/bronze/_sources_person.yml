@@ -75,3 +75,15 @@ sources:
           - name: IsOnlyStateProvinceFlag
           - name: Name
           - name: TerritoryID
+
+      - name: BusinessEntityAddress
+        description: "Links a person (BusinessEntityID) to one or more addresses with an address type."
+        columns:
+          - name: BusinessEntityID
+            tests: [not_null]
+          - name: AddressID
+            tests: [not_null]
+          - name: AddressTypeID
+            tests: [not_null]
+          - name: rowguid
+          - name: ModifiedDate

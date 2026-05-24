@@ -1,0 +1,52 @@
+version: 2
+
+models:
+  - name: fct_sales_detail
+    description: |
+      Sales fact at order-line grain. Joins to SCD2 dimensions are
+      point-in-time using order_date. Header-level amounts (freight, tax)
+      are allocated proportionally to line_total.
+    columns:
+      - name: sales_order_line_sk
+        tests: [not_null, unique]
+      - name: sales_order_bk
+        tests: [not_null]
+      - name: order_date_sk
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_date')
+              field: date_sk
+      - name: customer_sk
+        tests:
+          - relationships:
+              to: ref('dim_customer')
+              field: customer_sk
+      - name: product_sk
+        tests:
+          - relationships:
+              to: ref('dim_product')
+              field: product_sk
+      - name: sales_territory_sk
+        tests:
+          - relationships:
+              to: ref('dim_salesterritory')
+              field: sales_territory_sk
+      - name: special_offer_sk
+        tests:
+          - relationships:
+              to: ref('dim_special_offer')
+              field: special_offer_sk
+      - name: sales_order_junk_sk
+        tests:
+          - relationships:
+              to: ref('dim_sales_order_junk')
+              field: sales_order_junk_sk
+      - name: order_qty
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+      - name: line_total
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
