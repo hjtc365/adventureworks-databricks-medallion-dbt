@@ -1,0 +1,77 @@
+version: 2
+
+# Person domain Bronze sources.
+# NOTE on delimiters: Person, PersonPhone, EmailAddress are PIPE-DELIMITED ('+|')
+# with a row terminator of '&|\n' to avoid collisions with embedded XML and
+# free-text content. Address and StateProvince are tab-delimited.
+
+sources:
+  - name: person
+    description: "AdventureWorks Person domain — individuals, contact info, addresses."
+    database: "{{ 'adventureworks_prod' if target.name == 'prod' else 'adventureworks_dev' }}"
+    schema: bronze
+    loaded_at_field: ModifiedDate
+
+    tables:
+      - name: Person
+        description: "Individual people — customers, employees, vendor contacts."
+        columns:
+          - name: BusinessEntityID
+            tests: [not_null, unique]
+          - name: PersonType
+            description: "EM=Employee, SC=Store contact, IN=Individual customer, etc."
+          - name: NameStyle
+          - name: Title
+          - name: FirstName
+          - name: MiddleName
+          - name: LastName
+          - name: Suffix
+          - name: EmailPromotion
+          - name: AdditionalContactInfo
+            description: "XML — load as STRING in Databricks."
+          - name: Demographics
+            description: "XML — load as STRING in Databricks."
+          - name: rowguid
+          - name: ModifiedDate
+
+      - name: PersonPhone
+        columns:
+          - name: BusinessEntityID
+            tests: [not_null]
+          - name: PhoneNumber
+          - name: PhoneNumberTypeID
+          - name: ModifiedDate
+
+      - name: EmailAddress
+        columns:
+          - name: BusinessEntityID
+            tests: [not_null]
+          - name: EmailAddressID
+            tests: [not_null]
+          - name: EmailAddress
+          - name: rowguid
+          - name: ModifiedDate
+
+      - name: Address
+        columns:
+          - name: AddressID
+            tests: [not_null, unique]
+          - name: AddressLine1
+          - name: AddressLine2
+          - name: City
+          - name: StateProvinceID
+          - name: PostalCode
+          - name: SpatialLocation
+            description: "geography type — load as STRING."
+          - name: rowguid
+          - name: ModifiedDate
+
+      - name: StateProvince
+        columns:
+          - name: StateProvinceID
+            tests: [not_null, unique]
+          - name: StateProvinceCode
+          - name: CountryRegionCode
+          - name: IsOnlyStateProvinceFlag
+          - name: Name
+          - name: TerritoryID

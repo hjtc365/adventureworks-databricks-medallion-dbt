@@ -1,0 +1,76 @@
+version: 2
+
+sources:
+  - name: production
+    description: "AdventureWorks Production domain — products, categories, inventory, pricing."
+    database: "{{ 'adventureworks_prod' if target.name == 'prod' else 'adventureworks_dev' }}"
+    schema: bronze
+    loaded_at_field: ModifiedDate
+
+    tables:
+      - name: Product
+        description: "Product master."
+        columns:
+          - name: ProductID
+            tests: [not_null, unique]
+          - name: Name
+          - name: ProductNumber
+            tests: [not_null]
+          - name: MakeFlag
+          - name: FinishedGoodsFlag
+          - name: Color
+          - name: SafetyStockLevel
+          - name: ReorderPoint
+          - name: StandardCost
+          - name: ListPrice
+          - name: Size
+          - name: SizeUnitMeasureCode
+          - name: WeightUnitMeasureCode
+          - name: Weight
+          - name: DaysToManufacture
+          - name: ProductLine
+          - name: Class
+          - name: Style
+          - name: ProductSubcategoryID
+          - name: ProductModelID
+          - name: SellStartDate
+          - name: SellEndDate
+          - name: DiscontinuedDate
+          - name: rowguid
+          - name: ModifiedDate
+
+      - name: ProductSubcategory
+        columns:
+          - name: ProductSubcategoryID
+            tests: [not_null, unique]
+          - name: ProductCategoryID
+            tests: [not_null]
+          - name: Name
+
+      - name: ProductCategory
+        columns:
+          - name: ProductCategoryID
+            tests: [not_null, unique]
+          - name: Name
+
+      - name: ProductListPriceHistory
+        columns:
+          - name: ProductID
+            tests: [not_null]
+          - name: StartDate
+            tests: [not_null]
+          - name: EndDate
+          - name: ListPrice
+          - name: ModifiedDate
+
+      - name: ProductInventory
+        columns:
+          - name: ProductID
+            tests: [not_null]
+          - name: LocationID
+            tests: [not_null]
+          - name: Shelf
+          - name: Bin
+          - name: Quantity
+          - name: rowguid
+          - name: ModifiedDate

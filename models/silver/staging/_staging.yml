@@ -1,0 +1,206 @@
+version: 2
+
+models:
+
+  # ────────────────────────────────────────────────────────
+  # Person domain
+  # ────────────────────────────────────────────────────────
+
+  - name: stg_person
+    description: "One row per person — cleansed, with derived full_name."
+    columns:
+      - name: person_bk
+        tests: [not_null, unique]
+      - name: person_type
+        tests:
+          - accepted_values:
+              values: ['SC', 'IN', 'SP', 'EM', 'VC', 'GC']
+
+  - name: stg_person_phone
+    columns:
+      - name: person_bk
+        tests: [not_null]
+
+  - name: stg_email_address
+    columns:
+      - name: email_address_bk
+        tests: [not_null]
+      - name: person_bk
+        tests: [not_null]
+
+  - name: stg_address
+    columns:
+      - name: address_bk
+        tests: [not_null, unique]
+
+  - name: stg_state_province
+    columns:
+      - name: state_province_bk
+        tests: [not_null, unique]
+      - name: state_province_code
+        tests: [not_null]
+
+  # ────────────────────────────────────────────────────────
+  # Sales domain
+  # ────────────────────────────────────────────────────────
+
+  - name: stg_customer
+    description: "Customer master — individual / store / store-contact typed."
+    columns:
+      - name: customer_bk
+        tests: [not_null, unique]
+      - name: account_number
+        tests: [not_null]
+      - name: customer_type
+        tests:
+          - accepted_values:
+              values: ['Individual', 'Store', 'StoreContact', 'Unknown']
+
+  - name: stg_sales_order_header
+    description: "Incremental MERGE on sales_order_bk."
+    config:
+      contract:
+        enforced: false
+    columns:
+      - name: sales_order_bk
+        tests: [not_null, unique]
+      - name: customer_bk
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_customer')
+              field: customer_bk
+      - name: order_status
+        tests:
+          - accepted_values:
+              values: ['In process', 'Approved', 'Backordered', 'Rejected', 'Shipped', 'Cancelled', 'Unknown']
+      - name: total_due
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+
+  - name: stg_sales_order_detail
+    description: "Order line items — incremental MERGE on composite line key."
+    columns:
+      - name: sales_order_line_bk
+        tests: [not_null, unique]
+      - name: sales_order_bk
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_sales_order_header')
+              field: sales_order_bk
+      - name: order_qty
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+      - name: unit_price_discount
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 1
+
+  - name: stg_sales_territory
+    columns:
+      - name: sales_territory_bk
+        tests: [not_null, unique]
+
+  - name: stg_sales_territory_history
+    columns:
+      - name: sales_person_bk
+        tests: [not_null]
+      - name: sales_territory_bk
+        tests: [not_null]
+
+  - name: stg_sales_person
+    columns:
+      - name: sales_person_bk
+        tests: [not_null, unique]
+
+  - name: stg_special_offer
+    columns:
+      - name: special_offer_bk
+        tests: [not_null, unique]
+      - name: discount_pct
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 1
+
+  - name: stg_special_offer_product
+    columns:
+      - name: special_offer_bk
+        tests: [not_null]
+      - name: product_bk
+        tests: [not_null]
+
+  - name: stg_currency_rate
+    columns:
+      - name: currency_rate_bk
+        tests: [not_null, unique]
+
+  - name: stg_ship_method
+    columns:
+      - name: ship_method_bk
+        tests: [not_null, unique]
+
+  - name: stg_credit_card
+    columns:
+      - name: credit_card_bk
+        tests: [not_null, unique]
+
+  # ────────────────────────────────────────────────────────
+  # Production domain
+  # ────────────────────────────────────────────────────────
+
+  - name: stg_product
+    columns:
+      - name: product_bk
+        tests: [not_null, unique]
+      - name: list_price
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+
+  - name: stg_product_subcategory
+    columns:
+      - name: product_subcategory_bk
+        tests: [not_null, unique]
+
+  - name: stg_product_category
+    columns:
+      - name: product_category_bk
+        tests: [not_null, unique]
+
+  - name: stg_product_list_price_history
+    columns:
+      - name: product_bk
+        tests: [not_null]
+
+  - name: stg_product_inventory
+    columns:
+      - name: product_bk
+        tests: [not_null]
+      - name: location_bk
+        tests: [not_null]
+
+  # ────────────────────────────────────────────────────────
+  # HumanResources domain
+  # ────────────────────────────────────────────────────────
+
+  - name: stg_employee
+    columns:
+      - name: employee_bk
+        tests: [not_null, unique]
+
+  - name: stg_employee_pay_history
+    columns:
+      - name: employee_bk
+        tests: [not_null]
+
+  - name: stg_employee_dept_history
+    columns:
+      - name: employee_bk
+        tests: [not_null]
+      - name: department_bk
+        tests: [not_null]

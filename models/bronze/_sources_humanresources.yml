@@ -1,0 +1,58 @@
+version: 2
+
+# HumanResources domain.
+# NOTE: Employee.OrganizationNode is hierarchyid (load as STRING).
+# Employee.OrganizationLevel is INT (computed by SQL Server from
+# OrganizationNode.GetLevel(); NULL for the root node / CEO).
+
+sources:
+  - name: humanresources
+    description: "AdventureWorks HR domain — employees, departments, pay history."
+    database: "{{ 'adventureworks_prod' if target.name == 'prod' else 'adventureworks_dev' }}"
+    schema: bronze
+    loaded_at_field: ModifiedDate
+
+    tables:
+      - name: Employee
+        description: "Employee master with org-hierarchy and pay info."
+        columns:
+          - name: BusinessEntityID
+            tests: [not_null, unique]
+          - name: NationalIDNumber
+          - name: LoginID
+          - name: OrganizationNode
+            description: "hierarchyid — load as STRING."
+          - name: OrganizationLevel
+            description: "INT depth (0 = root). Pre-computed in CSV. NULL for CEO."
+          - name: JobTitle
+          - name: BirthDate
+          - name: MaritalStatus
+          - name: Gender
+          - name: HireDate
+          - name: SalariedFlag
+          - name: VacationHours
+          - name: SickLeaveHours
+          - name: CurrentFlag
+          - name: rowguid
+          - name: ModifiedDate
+
+      - name: EmployeePayHistory
+        columns:
+          - name: BusinessEntityID
+            tests: [not_null]
+          - name: RateChangeDate
+            tests: [not_null]
+          - name: Rate
+          - name: PayFrequency
+          - name: ModifiedDate
+
+      - name: EmployeeDepartmentHistory
+        columns:
+          - name: BusinessEntityID
+            tests: [not_null]
+          - name: DepartmentID
+            tests: [not_null]
+          - name: ShiftID
+          - name: StartDate
+          - name: EndDate
+          - name: ModifiedDate

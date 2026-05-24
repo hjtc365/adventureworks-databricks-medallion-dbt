@@ -1,0 +1,141 @@
+version: 2
+
+# Bronze sources for the Sales domain.
+# All tables are external Delta tables created in Databricks via COPY INTO
+# from raw AdventureWorks CSV exports. dbt does not own the load — sources
+# are read-only references for Silver staging models.
+
+sources:
+  - name: sales
+    description: "AdventureWorks Sales domain — raw OLTP CSV exports landed in Bronze."
+    database: "{{ 'adventureworks_prod' if target.name == 'prod' else 'adventureworks_dev' }}"
+    schema: bronze
+    loader: databricks_copy_into
+    loaded_at_field: ModifiedDate
+
+    freshness:
+      warn_after: { count: 24, period: hour }
+      error_after: { count: 48, period: hour }
+
+    tables:
+      - name: Customer
+        description: "Customer master — links Person (individual) or Store (B2B) to a SalesTerritory."
+        columns:
+          - name: CustomerID
+            description: "Surrogate PK from OLTP."
+            tests: [not_null, unique]
+          - name: PersonID
+            description: "FK to Person — null for store-only customers."
+          - name: StoreID
+            description: "FK to Store — null for individual customers."
+          - name: TerritoryID
+            description: "FK to SalesTerritory."
+          - name: AccountNumber
+            description: "Pre-computed string 'AW' + 8-digit padded CustomerID. Present verbatim in the CSV."
+          - name: rowguid
+          - name: ModifiedDate
+
+      - name: SalesOrderHeader
+        description: "One row per sales order."
+        columns:
+          - name: SalesOrderID
+            tests: [not_null, unique]
+          - name: SalesOrderNumber
+            description: "Pre-computed 'SO' + SalesOrderID. Present verbatim in the CSV."
+          - name: TotalDue
+            description: "Pre-computed SubTotal + TaxAmt + Freight. Present verbatim in the CSV."
+          - name: OrderDate
+          - name: CustomerID
+          - name: SalesPersonID
+          - name: TerritoryID
+          - name: ModifiedDate
+
+      - name: SalesOrderDetail
+        description: "Order line items."
+        columns:
+          - name: SalesOrderID
+            tests: [not_null]
+          - name: SalesOrderDetailID
+            tests: [not_null]
+          - name: ProductID
+          - name: SpecialOfferID
+          - name: OrderQty
+          - name: UnitPrice
+          - name: UnitPriceDiscount
+          - name: LineTotal
+            description: "Pre-computed UnitPrice * (1-UnitPriceDiscount) * OrderQty. Present verbatim."
+          - name: ModifiedDate
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [SalesOrderID, SalesOrderDetailID]
+
+      - name: SalesTerritory
+        columns:
+          - name: TerritoryID
+            tests: [not_null, unique]
+          - name: Name
+          - name: CountryRegionCode
+          - name: Group
+          - name: ModifiedDate
+
+      - name: SalesTerritoryHistory
+        description: "Historical assignment of sales people to territories."
+        columns:
+          - name: BusinessEntityID
+            tests: [not_null]
+          - name: TerritoryID
+            tests: [not_null]
+          - name: StartDate
+            tests: [not_null]
+          - name: EndDate
+
+      - name: SalesPerson
+        columns:
+          - name: BusinessEntityID
+            tests: [not_null, unique]
+          - name: TerritoryID
+          - name: SalesQuota
+          - name: Bonus
+          - name: CommissionPct
+
+      - name: SpecialOffer
+        columns:
+          - name: SpecialOfferID
+            tests: [not_null, unique]
+          - name: Description
+          - name: DiscountPct
+          - name: Type
+          - name: Category
+          - name: StartDate
+          - name: EndDate
+
+      - name: SpecialOfferProduct
+        columns:
+          - name: SpecialOfferID
+            tests: [not_null]
+          - name: ProductID
+            tests: [not_null]
+
+      - name: CurrencyRate
+        columns:
+          - name: CurrencyRateID
+            tests: [not_null, unique]
+          - name: CurrencyRateDate
+          - name: FromCurrencyCode
+          - name: ToCurrencyCode
+          - name: AverageRate
+          - name: EndOfDayRate
+
+      - name: ShipMethod
+        columns:
+          - name: ShipMethodID
+            tests: [not_null, unique]
+          - name: Name
+
+      - name: CreditCard
+        columns:
+          - name: CreditCardID
+            tests: [not_null, unique]
+          - name: CardType
+          - name: ExpMonth
+          - name: ExpYear
