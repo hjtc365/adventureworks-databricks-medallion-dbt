@@ -19,6 +19,16 @@ with
                 >= (select dateadd(day, -1, max(modified_at)) from {{ this }})
         {% endif %}
 
+    ),
+
+    deduplicated as (
+        {{
+            dbt_utils.deduplicate(
+                relation="src",
+                partition_by="productid, locationid",
+                order_by="modifieddate desc",
+            )
+        }}
     )
 
 select
@@ -29,4 +39,4 @@ select
     cast(quantity as int) as quantity,
     rowguid as row_guid,
     cast(left(modifieddate, 19) as timestamp) as modified_at
-from src
+from deduplicated

@@ -1,6 +1,15 @@
 {{ config(materialized="view") }}
 
-with src as (select * from {{ source("production", "Product") }})
+with
+    src as (select * from {{ source("production", "Product") }}),
+
+    deduplicated as (
+        {{
+            dbt_utils.deduplicate(
+                relation="src", partition_by="productid", order_by="modifieddate desc"
+            )
+        }}
+    )
 
 select
     cast(productid as int) as product_bk,
@@ -28,4 +37,4 @@ select
     cast(discontinueddate as timestamp) as discontinued_at,
     rowguid as row_guid,
     cast(left(modifieddate, 19) as timestamp) as modified_at
-from src
+from deduplicated

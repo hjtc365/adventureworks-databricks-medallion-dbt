@@ -1,43 +1,180 @@
 version: 2
 
 models:
-
   # ────────────────────────────────────────────────────────
   # Person domain
   # ────────────────────────────────────────────────────────
 
+  - name: stg_business_entity_address
+    description: "One row per business-entity/address link — deduplicated. business_entity_bk covers persons, stores and vendors."
+    columns:
+      - name: business_entity_bk
+        description: "Business entity ID — can reference a person, store, or vendor. Not exclusively a FK to stg_person."
+        tests:
+          - not_null
+      - name: address_bk
+        description: "Address ID — foreign key to stg_address."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_address')
+              field: address_bk
+      - name: address_type_id
+        description: "Address type (1=Billing, 2=Home, 3=Main Office, 4=Primary, 5=Shipping, 6=Archive)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2, 3, 4, 5, 6]
+      - name: row_guid
+        description: "Globally unique identifier for the record."
+        tests: [not_null, unique]
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - business_entity_bk
+            - address_bk
+            - address_type_id
+
   - name: stg_person
-    description: "One row per person — cleansed, with derived full_name."
+    description: "One row per person — deduplicated, cleansed, with derived full_name and type."
     columns:
       - name: person_bk
+        description: "Business entity ID, unique per person."
         tests: [not_null, unique]
       - name: person_type
+        description: "Person type code (SC=Store Contact, IN=Individual, SP=Sales Person, EM=Employee, VC=Vendor Contact, GC=General Contact)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["SC", "IN", "SP", "EM", "VC", "GC"]
+      - name: is_eastern_name_style
+        description: "True if name is in Eastern style (surname first)."
+      - name: first_name
+        description: "First name."
+        tests: [not_null]
+      - name: last_name
+        description: "Last name."
+        tests: [not_null]
+      - name: full_name
+        description: "Derived full name — firstname + middlename + lastname + suffix."
+        tests: [not_null]
+      - name: email_promotion_flag
+        description: "Email promotion preference (0=None, 1=AdventureWorks only, 2=Partners)."
         tests:
           - accepted_values:
-              values: ['SC', 'IN', 'SP', 'EM', 'VC', 'GC']
+              values: [0, 1, 2]
+      - name: row_guid
+        description: "Globally unique identifier for the person."
+        tests: [not_null, unique]
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
 
   - name: stg_person_phone
+    description: "One row per phone number per person — deduplicated."
     columns:
       - name: person_bk
+        description: "Business entity ID — foreign key to stg_person."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_person')
+              field: person_bk
+      - name: phone_type_id
+        description: "Phone number type ID."
         tests: [not_null]
+      - name: phone_number
+        description: "Phone number string."
+        tests: [not_null]
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - person_bk
+            - phone_number
+            - phone_type_id
 
   - name: stg_email_address
+    description: "One row per email address per person — deduplicated, lowercased and trimmed."
     columns:
       - name: email_address_bk
-        tests: [not_null]
+        description: "Email address business key."
+        tests: [not_null, unique]
       - name: person_bk
+        description: "Business entity ID — foreign key to stg_person."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_person')
+              field: person_bk
+      - name: email_address
+        description: "Email address, lowercased and trimmed."
+        tests: [not_null]
+      - name: row_guid
+        description: "Globally unique identifier for the email address."
+        tests: [not_null, unique]
+      - name: modified_at
+        description: "Timestamp of the last modification."
         tests: [not_null]
 
   - name: stg_address
+    description: "One row per address — deduplicated, cleansed."
     columns:
       - name: address_bk
+        description: "Address ID, business key."
         tests: [not_null, unique]
+      - name: address_line_1
+        description: "First line of the street address."
+        tests: [not_null]
+      - name: address_line_2
+        description: "Second line of the street address (optional)."
+      - name: city
+        description: "City name."
+        tests: [not_null]
+      - name: state_province_bk
+        description: "Foreign key to stg_state_province."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_state_province')
+              field: state_province_bk
+      - name: postal_code
+        description: "Postal or ZIP code."
+        tests: [not_null]
+      - name: row_guid
+        description: "Globally unique identifier for the address."
+        tests: [not_null, unique]
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
 
   - name: stg_state_province
+    description: "State/province reference table — deduplicated."
     columns:
       - name: state_province_bk
+        description: "State/province ID, business key."
         tests: [not_null, unique]
       - name: state_province_code
+        description: "ISO state/province code."
+        tests: [not_null]
+      - name: country_region_code
+        description: "ISO country/region code."
+        tests: [not_null]
+      - name: is_only_state_province
+        description: "True if the country has only one state/province record."
+      - name: state_province_name
+        description: "State/province name."
+        tests: [not_null]
+      - name: sales_territory_bk
+        description: "Foreign key to stg_sales_territory."
+        tests: [not_null]
+      - name: modified_at
+        description: "Timestamp of the last modification."
         tests: [not_null]
 
   # ────────────────────────────────────────────────────────
@@ -45,162 +182,564 @@ models:
   # ────────────────────────────────────────────────────────
 
   - name: stg_customer
-    description: "Customer master — individual / store / store-contact typed."
+    description: "Customer master — deduplicated. Typed as Individual, Store, or StoreContact."
     columns:
       - name: customer_bk
+        description: "Customer ID, business key."
         tests: [not_null, unique]
+      - name: person_bk
+        description: "FK to stg_person. Null for store-only customers."
+      - name: store_bk
+        description: "FK to store. Null for individual customers."
+      - name: sales_territory_bk
+        description: "FK to stg_sales_territory."
       - name: account_number
-        tests: [not_null]
+        description: "Customer account number."
+        tests: [not_null, unique]
       - name: customer_type
+        description: "Derived customer type."
         tests:
+          - not_null
           - accepted_values:
-              values: ['Individual', 'Store', 'StoreContact', 'Unknown']
+              values: ["Individual", "Store", "StoreContact", "Unknown"]
+      - name: row_guid
+        description: "Globally unique identifier for the customer."
+        tests: [not_null, unique]
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
 
   - name: stg_sales_order_header
-    description: "Incremental MERGE on sales_order_bk."
+    description: "Sales order header — incremental MERGE on sales_order_bk. Deduplicated per order."
     config:
       contract:
         enforced: false
     columns:
       - name: sales_order_bk
+        description: "Sales order ID, business key."
         tests: [not_null, unique]
+      - name: sales_order_number
+        description: "Human-readable order number (e.g. SO43659)."
+        tests: [not_null, unique]
+      - name: order_date
+        description: "Date the order was placed."
+        tests: [not_null]
       - name: customer_bk
+        description: "FK to stg_customer."
         tests:
           - not_null
           - relationships:
               to: ref('stg_customer')
               field: customer_bk
+      - name: is_online_order
+        description: "True if the order was placed online."
+      - name: order_status_code
+        description: "Numeric status code (1-6)."
       - name: order_status
+        description: "Human-readable order status label."
         tests:
+          - not_null
           - accepted_values:
-              values: ['In process', 'Approved', 'Backordered', 'Rejected', 'Shipped', 'Cancelled', 'Unknown']
+              values:
+                [
+                  "In process",
+                  "Approved",
+                  "Backordered",
+                  "Rejected",
+                  "Shipped",
+                  "Cancelled",
+                  "Unknown",
+                ]
+      - name: ship_method_bk
+        description: "FK to stg_ship_method."
+      - name: credit_card_bk
+        description: "FK to stg_credit_card. Null for non-credit-card orders."
       - name: total_due
+        description: "Total amount due including freight and tax."
         tests:
+          - not_null
           - dbt_expectations.expect_column_values_to_be_between:
               min_value: 0
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
 
   - name: stg_sales_order_detail
     description: "Order line items — incremental MERGE on composite line key."
     columns:
       - name: sales_order_line_bk
+        description: "Composite business key: SalesOrderID-SalesOrderDetailID."
         tests: [not_null, unique]
       - name: sales_order_bk
+        description: "FK to stg_sales_order_header."
         tests:
           - not_null
           - relationships:
               to: ref('stg_sales_order_header')
               field: sales_order_bk
-      - name: order_qty
+      - name: product_bk
+        description: "FK to stg_product."
         tests:
+          - not_null
+          - relationships:
+              to: ref('stg_product')
+              field: product_bk
+      - name: special_offer_bk
+        description: "FK to stg_special_offer."
+        tests: [not_null]
+      - name: order_qty
+        description: "Quantity ordered."
+        tests:
+          - not_null
           - dbt_expectations.expect_column_values_to_be_between:
               min_value: 1
-      - name: unit_price_discount
+      - name: unit_price
+        description: "Selling price per unit."
         tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: unit_price_discount
+        description: "Discount as a decimal fraction (0.0 – 1.0)."
+        tests:
+          - not_null
           - dbt_expectations.expect_column_values_to_be_between:
               min_value: 0
               max_value: 1
+      - name: line_total
+        description: "Computed line total: qty * unit_price * (1 – discount)."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
 
   - name: stg_sales_territory
+    description: "Sales territory reference — deduplicated."
     columns:
       - name: sales_territory_bk
+        description: "Territory ID, business key."
         tests: [not_null, unique]
+      - name: territory_name
+        description: "Territory name."
+        tests: [not_null]
+      - name: country_region_code
+        description: "ISO country/region code."
+        tests: [not_null]
+      - name: territory_group
+        description: "Regional group (e.g. North America, Europe)."
+        tests: [not_null]
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
 
   - name: stg_sales_territory_history
+    description: "History of sales person territory assignments — deduplicated."
     columns:
       - name: sales_person_bk
-        tests: [not_null]
+        description: "FK to stg_sales_person."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_sales_person')
+              field: sales_person_bk
       - name: sales_territory_bk
+        description: "FK to stg_sales_territory."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_sales_territory')
+              field: sales_territory_bk
+      - name: start_at
+        description: "Date the sales person started in this territory."
         tests: [not_null]
+      - name: end_at
+        description: "Date the sales person left this territory. Null = still active."
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - sales_person_bk
+            - sales_territory_bk
+            - start_at
 
   - name: stg_sales_person
+    description: "Sales person quota and commission data — deduplicated."
     columns:
       - name: sales_person_bk
+        description: "Business entity ID, business key."
         tests: [not_null, unique]
-
-  - name: stg_special_offer
-    columns:
-      - name: special_offer_bk
-        tests: [not_null, unique]
-      - name: discount_pct
+      - name: sales_territory_bk
+        description: "FK to stg_sales_territory. Null if unassigned."
+      - name: commission_pct
+        description: "Commission percentage as a decimal fraction."
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
               min_value: 0
               max_value: 1
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
 
-  - name: stg_special_offer_product
+  - name: stg_special_offer
+    description: "Promotions and discounts — deduplicated."
     columns:
       - name: special_offer_bk
+        description: "Special offer ID, business key."
+        tests: [not_null, unique]
+      - name: offer_description
+        description: "Description of the promotion."
         tests: [not_null]
+      - name: discount_pct
+        description: "Discount as a decimal fraction."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 1
+      - name: offer_type
+        description: "Type of offer (e.g. Seasonal Discount, Volume Discount)."
+        tests: [not_null]
+      - name: offer_category
+        description: "Category of offer (e.g. Reseller, Customer)."
+        tests: [not_null]
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
+
+  - name: stg_special_offer_product
+    description: "Bridge table linking special offers to eligible products — deduplicated."
+    columns:
+      - name: special_offer_bk
+        description: "FK to stg_special_offer."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_special_offer')
+              field: special_offer_bk
       - name: product_bk
+        description: "FK to stg_product."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_product')
+              field: product_bk
+      - name: modified_at
+        description: "Timestamp of the last modification."
         tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - special_offer_bk
+            - product_bk
 
   - name: stg_currency_rate
+    description: "Daily currency exchange rates — deduplicated."
     columns:
       - name: currency_rate_bk
+        description: "Currency rate ID, business key."
         tests: [not_null, unique]
+      - name: from_currency_code
+        description: "Source currency ISO code."
+        tests: [not_null]
+      - name: to_currency_code
+        description: "Target currency ISO code."
+        tests: [not_null]
+      - name: average_rate
+        description: "Average exchange rate for the day."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: end_of_day_rate
+        description: "End-of-day exchange rate."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
 
   - name: stg_ship_method
+    description: "Shipping method reference — deduplicated."
     columns:
       - name: ship_method_bk
+        description: "Ship method ID, business key."
         tests: [not_null, unique]
+      - name: ship_method_name
+        description: "Shipping method name."
+        tests: [not_null]
+      - name: ship_base_cost
+        description: "Fixed base shipping cost."
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: ship_rate
+        description: "Per-weight shipping rate."
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
 
   - name: stg_credit_card
+    description: "Credit card reference — deduplicated. Card numbers are masked to last 4 digits."
     columns:
       - name: credit_card_bk
+        description: "Credit card ID, business key."
         tests: [not_null, unique]
+      - name: card_type
+        description: "Card brand (e.g. Visa, MasterCard)."
+        tests: [not_null]
+      - name: card_number_masked
+        description: "Card number with all but last 4 digits replaced with X."
+        tests: [not_null]
+      - name: exp_month
+        description: "Expiry month (1-12)."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+              max_value: 12
+      - name: exp_year
+        description: "Expiry year."
+        tests: [not_null]
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
 
   # ────────────────────────────────────────────────────────
   # Production domain
   # ────────────────────────────────────────────────────────
 
   - name: stg_product
+    description: "Product master — deduplicated, with all attributes and subcategory FK."
     columns:
       - name: product_bk
+        description: "Product ID, business key."
         tests: [not_null, unique]
+      - name: product_name
+        description: "Product name."
+        tests: [not_null]
+      - name: product_number
+        description: "Product number (SKU)."
+        tests: [not_null, unique]
+      - name: is_make
+        description: "True if manufactured in-house."
+      - name: is_finished_good
+        description: "True if the product is sold to customers."
       - name: list_price
+        description: "Current list price."
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
               min_value: 0
+      - name: standard_cost
+        description: "Standard manufacturing cost."
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: product_subcategory_bk
+        description: "FK to stg_product_subcategory. Null for uncategorised products."
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
 
   - name: stg_product_subcategory
+    description: "Product subcategory reference — deduplicated."
     columns:
       - name: product_subcategory_bk
+        description: "Product subcategory ID, business key."
         tests: [not_null, unique]
+      - name: product_category_bk
+        description: "FK to stg_product_category."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_product_category')
+              field: product_category_bk
+      - name: subcategory_name
+        description: "Subcategory name."
+        tests: [not_null]
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
 
   - name: stg_product_category
+    description: "Top-level product category reference — deduplicated."
     columns:
       - name: product_category_bk
+        description: "Product category ID, business key."
         tests: [not_null, unique]
+      - name: category_name
+        description: "Category name."
+        tests: [not_null, unique]
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
 
   - name: stg_product_list_price_history
+    description: "Historical list prices per product — deduplicated."
     columns:
       - name: product_bk
+        description: "FK to stg_product."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_product')
+              field: product_bk
+      - name: start_at
+        description: "Date the list price became effective."
         tests: [not_null]
+      - name: end_at
+        description: "Date the list price was superseded. Null = current price."
+      - name: list_price
+        description: "List price effective during this period."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - product_bk
+            - start_at
 
   - name: stg_product_inventory
+    description: "Current product inventory by location — incremental MERGE on product_bk + location_bk."
     columns:
       - name: product_bk
-        tests: [not_null]
+        description: "FK to stg_product."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_product')
+              field: product_bk
       - name: location_bk
+        description: "Location ID."
         tests: [not_null]
+      - name: quantity
+        description: "Quantity on hand."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - product_bk
+            - location_bk
 
   # ────────────────────────────────────────────────────────
   # HumanResources domain
   # ────────────────────────────────────────────────────────
 
   - name: stg_employee
+    description: "Employee master — deduplicated. Organisation hierarchy, job and personal attributes."
     columns:
       - name: employee_bk
+        description: "Business entity ID, unique per employee."
         tests: [not_null, unique]
+      - name: login_id
+        description: "Network login ID."
+        tests: [not_null]
+      - name: job_title
+        description: "Job title."
+        tests: [not_null]
+      - name: hire_date
+        description: "Date the employee was hired."
+        tests: [not_null]
+      - name: is_salaried
+        description: "True if the employee is salaried (vs. hourly)."
+      - name: is_current
+        description: "True if the employee is currently active."
+      - name: marital_status
+        description: "Marital status code."
+        tests:
+          - accepted_values:
+              values: ["M", "S"]
+      - name: gender
+        description: "Gender code."
+        tests:
+          - accepted_values:
+              values: ["M", "F"]
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
 
   - name: stg_employee_pay_history
+    description: "Employee pay rate history — deduplicated."
     columns:
       - name: employee_bk
+        description: "FK to stg_employee."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_employee')
+              field: employee_bk
+      - name: rate_change_at
+        description: "Date the pay rate changed."
         tests: [not_null]
+      - name: pay_rate
+        description: "Hourly or salaried pay rate."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: pay_frequency
+        description: "Pay frequency (1=Monthly, 2=Bi-weekly)."
+        tests:
+          - not_null
+          - accepted_values:
+              values: [1, 2]
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - employee_bk
+            - rate_change_at
 
   - name: stg_employee_dept_history
+    description: "Employee department and shift history — deduplicated. end_date null = currently active."
     columns:
       - name: employee_bk
-        tests: [not_null]
+        description: "FK to stg_employee."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_employee')
+              field: employee_bk
       - name: department_bk
+        description: "Department ID."
         tests: [not_null]
+      - name: shift_bk
+        description: "Shift ID."
+        tests: [not_null]
+      - name: start_date
+        description: "Date the employee started in this department/shift."
+        tests: [not_null]
+      - name: end_date
+        description: "Date the employee left this department/shift. Null = currently active."
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - employee_bk
+            - department_bk
+            - shift_bk
+            - start_date

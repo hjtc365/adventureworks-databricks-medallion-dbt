@@ -1,6 +1,17 @@
 {{ config(materialized="view") }}
 
-with src as (select * from {{ source("sales", "CreditCard") }})
+with
+    src as (select * from {{ source("sales", "CreditCard") }}),
+
+    deduplicated as (
+        {{
+            dbt_utils.deduplicate(
+                relation="src",
+                partition_by="creditcardid",
+                order_by="modifieddate desc",
+            )
+        }}
+    )
 
 select
     cast(creditcardid as int) as credit_card_bk,
@@ -12,4 +23,4 @@ select
     cast(expmonth as int) as exp_month,
     cast(expyear as int) as exp_year,
     cast(left(modifieddate, 19) as timestamp) as modified_at
-from src
+from deduplicated

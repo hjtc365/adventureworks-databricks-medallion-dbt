@@ -2,9 +2,18 @@
 
 -- Sales.Customer is small (~20k rows) and never updated in place.
 -- A view is sufficient; downstream snapshot handles SCD2.
+with
+    src as (select * from {{ source("sales", "Customer") }}),
 
-with src as (select * from {{ source("sales", "Customer") }})
-
+    deduplicated as (
+        {{
+            dbt_utils.deduplicate(
+                relation="src",
+                partition_by="customerid",
+                order_by="modifieddate desc",
+            )
+        }}
+    )
 select
     cast(customerid as int) as customer_bk,
     cast(personid as int) as person_bk,
@@ -22,4 +31,4 @@ select
     end as customer_type,
     rowguid as row_guid,
     cast(left(modifieddate, 19) as timestamp) as modified_at
-from src
+from deduplicated

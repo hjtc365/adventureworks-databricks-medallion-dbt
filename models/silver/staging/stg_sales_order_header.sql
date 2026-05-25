@@ -22,16 +22,14 @@ with
 
     ),
 
-    deduped as (
-
+    deduplicated as (
         {{
-            deduplicate(
+            dbt_utils.deduplicate(
                 relation="src",
-                partition_by="SalesOrderID",
-                order_by="ModifiedDate desc",
+                partition_by="salesorderid",
+                order_by="modifieddate desc",
             )
         }}
-
     )
 
 select
@@ -77,4 +75,4 @@ select
     comment as comment,
     rowguid as row_guid,
     cast(left(modifieddate, 19) as timestamp) as modified_at
-from deduped
+from deduplicated

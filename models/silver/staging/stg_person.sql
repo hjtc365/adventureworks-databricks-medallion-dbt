@@ -1,6 +1,17 @@
 {{ config(materialized="view") }}
 
-with src as (select * from {{ source("person", "Person") }})
+with
+    src as (select * from {{ source("person", "Person") }}),
+
+    deduplicated as (
+        {{
+            dbt_utils.deduplicate(
+                relation="src",
+                partition_by="businessentityid",
+                order_by="modifieddate desc",
+            )
+        }}
+    )
 
 select
     cast(businessentityid as int) as person_bk,
@@ -17,4 +28,4 @@ select
     cast(emailpromotion as int) as email_promotion_flag,
     rowguid as row_guid,
     cast(left(modifieddate, 19) as timestamp) as modified_at
-from src
+from deduplicated

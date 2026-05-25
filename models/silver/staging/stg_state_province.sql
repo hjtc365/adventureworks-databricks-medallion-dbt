@@ -1,6 +1,17 @@
 {{ config(materialized="view") }}
 
-with src as (select * from {{ source("person", "StateProvince") }})
+with
+    src as (select * from {{ source("person", "StateProvince") }}),
+
+    deduplicated as (
+        {{
+            dbt_utils.deduplicate(
+                relation="src",
+                partition_by="stateprovinceid",
+                order_by="modifieddate desc",
+            )
+        }}
+    )
 
 select
     cast(stateprovinceid as int) as state_province_bk,
@@ -10,4 +21,4 @@ select
     name as state_province_name,
     cast(territoryid as int) as sales_territory_bk,
     cast(left(modifieddate, 19) as timestamp) as modified_at
-from src
+from deduplicated

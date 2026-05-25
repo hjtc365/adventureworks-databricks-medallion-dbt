@@ -1,6 +1,17 @@
 {{ config(materialized="view") }}
 
-with src as (select * from {{ source("sales", "SalesTerritoryHistory") }})
+with
+    src as (select * from {{ source("sales", "SalesTerritoryHistory") }}),
+
+    deduplicated as (
+        {{
+            dbt_utils.deduplicate(
+                relation="src",
+                partition_by="businessentityid, territoryid, startdate",
+                order_by="modifieddate desc",
+            )
+        }}
+    )
 
 select
     cast(businessentityid as int) as sales_person_bk,
@@ -9,4 +20,4 @@ select
     cast(enddate as timestamp) as end_at,
     rowguid as row_guid,
     cast(left(modifieddate, 19) as timestamp) as modified_at
-from src
+from deduplicated

@@ -4,14 +4,16 @@
 -- Uses Person.BusinessEntityAddress to resolve PersonID -> AddressID.
 -- Address type ordering: Billing (1) preferred, then by most recently modified.
 with
-    customers as (select * from {{ ref("stg_customer") }}),
+    customer as (select * from {{ ref("stg_customer") }}),
 
-    addresses as (select * from {{ ref("stg_address") }}),
+    person as (select * from {{ ref("stg_person") }}),
+
+    addr as (select * from {{ ref("stg_address") }}),
 
     state_province as (select * from {{ ref("stg_state_province") }}),
 
     business_entity_address as (select * from {{ ref("stg_business_entity_address") }}),
-
+                        
     customer_address as (
         select
             c.customer_bk,
@@ -27,9 +29,10 @@ with
                 partition by c.customer_bk
                 order by bea.address_type_id asc, a.modified_at desc nulls last
             ) as _rn
-        from customers c
-        left join business_entity_address bea on bea.person_bk = c.person_bk
-        left join addresses a on a.address_bk = bea.address_bk
+        from customer c
+        left join person p on p.person_bk = c.person_bk
+        left join business_entity_address bea on bea.business_entity_bk = p.person_bk
+        left join addr a on a.address_bk = bea.address_bk
         left join state_province sp on sp.state_province_bk = a.state_province_bk
     )
 

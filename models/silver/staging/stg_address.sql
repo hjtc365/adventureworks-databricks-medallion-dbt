@@ -1,6 +1,15 @@
 {{ config(materialized="view") }}
 
-with src as (select * from {{ source("person", "Address") }})
+with
+    src as (select * from {{ source("person", "Address") }}),
+
+    deduplicated as (
+        {{
+            dbt_utils.deduplicate(
+                relation="src", partition_by="addressid", order_by="modifieddate desc"
+            )
+        }}
+    )
 
 select
     cast(addressid as int) as address_bk,
@@ -12,4 +21,4 @@ select
     cast(spatiallocation as string) as spatial_location_raw,
     rowguid as row_guid,
     cast(left(modifieddate, 19) as timestamp) as modified_at
-from src
+from deduplicated

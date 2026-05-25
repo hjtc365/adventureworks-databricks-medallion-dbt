@@ -1,6 +1,17 @@
 {{ config(materialized="view") }}
 
-with src as (select * from {{ source("sales", "SalesTerritory") }})
+with
+    src as (select * from {{ source("sales", "SalesTerritory") }}),
+
+    deduplicated as (
+        {{
+            dbt_utils.deduplicate(
+                relation="src",
+                partition_by="territoryid",
+                order_by="modifieddate desc",
+            )
+        }}
+    )
 
 select
     cast(territoryid as int) as sales_territory_bk,
@@ -13,4 +24,4 @@ select
     cast(costlastyear as decimal(19, 4)) as cost_last_year,
     rowguid as row_guid,
     cast(left(modifieddate, 19) as timestamp) as modified_at
-from src
+from deduplicated

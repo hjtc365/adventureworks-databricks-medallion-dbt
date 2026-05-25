@@ -8,7 +8,7 @@
 with
     d as (select * from {{ ref("stg_sales_order_detail") }}),
     h as (select * from {{ ref("stg_sales_order_header") }}),
-    line_totals as (
+    lt as (
         select sales_order_bk, sum(line_total) as header_line_total
         from d
         group by sales_order_bk
@@ -58,4 +58,4 @@ select
     d.modified_at
 from d
 inner join h on h.sales_order_bk = d.sales_order_bk
-left join line_totals lt on lt.sales_order_bk = d.sales_order_bk
+left join lt on lt.sales_order_bk = d.sales_order_bk

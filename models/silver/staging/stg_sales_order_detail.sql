@@ -19,6 +19,15 @@ with
                 >= (select dateadd(day, -1, max(modified_at)) from {{ this }})
         {% endif %}
 
+    ),
+    deduplicated as (
+        {{
+            dbt_utils.deduplicate(
+                relation="src",
+                partition_by="salesorderid, salesorderdetailid",
+                order_by="modifieddate desc",
+            )
+        }}
     )
 
 select
@@ -37,4 +46,4 @@ select
     cast(linetotal as decimal(38, 6)) as line_total,
     rowguid as row_guid,
     cast(left(modifieddate, 19) as timestamp) as modified_at
-from src
+from deduplicated

@@ -1,6 +1,17 @@
 {{ config(materialized="view") }}
 
-with src as (select * from {{ source("sales", "SpecialOffer") }})
+with
+    src as (select * from {{ source("sales", "SpecialOffer") }}),
+
+    deduplicated as (
+        {{
+            dbt_utils.deduplicate(
+                relation="src",
+                partition_by="specialofferid",
+                order_by="modifieddate desc",
+            )
+        }}
+    )
 
 select
     cast(specialofferid as int) as special_offer_bk,
@@ -14,4 +25,4 @@ select
     cast(maxqty as int) as max_qty,
     rowguid as row_guid,
     cast(left(modifieddate, 19) as timestamp) as modified_at
-from src
+from deduplicated

@@ -2,7 +2,18 @@
 
 -- Note: OrganizationLevel is INT (computed in CSV from OrganizationNode.GetLevel()).
 -- It is NULL for the root node (CEO).
-with src as (select * from {{ source("humanresources", "Employee") }})
+with
+    src as (select * from {{ source("humanresources", "Employee") }}),
+
+    deduplicated as (
+        {{
+            dbt_utils.deduplicate(
+                relation="src",
+                partition_by="businessentityid",
+                order_by="modifieddate desc",
+            )
+        }}
+    )
 
 select
     cast(businessentityid as int) as employee_bk,
@@ -21,4 +32,4 @@ select
     cast(currentflag as boolean) as is_current,
     rowguid as row_guid,
     cast(left(modifieddate, 19) as timestamp) as modified_at
-from src
+from deduplicated
