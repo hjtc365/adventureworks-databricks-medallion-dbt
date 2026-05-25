@@ -1,39 +1,311 @@
 version: 2
 
 models:
+  # ────────────────────────────────────────────────────────
+  # Person / Customer domain
+  # ────────────────────────────────────────────────────────
+
   - name: int_customer_addresses
-    description: "Customer + primary address for dim_customer."
+    description: >
+      One row per customer — joins each customer to their single primary address
+      via BusinessEntityAddress. Address type preference: Billing (type 1) first,
+      then most recently modified. Customers with no address record still appear
+      (all address columns will be null).
     columns:
       - name: customer_bk
-        tests: [not_null]
+        description: "Customer business key — PK, from stg_customer."
+        tests: [not_null, unique]
+      - name: address_bk
+        description: "Address business key. Null when the customer has no linked address."
+      - name: address_line_1
+        description: "First line of the primary address. Null when no address is resolved."
+      - name: address_line_2
+        description: "Second line of the primary address (optional)."
+      - name: city
+        description: "City of the primary address."
+      - name: state_province_code
+        description: "ISO state/province code."
+      - name: state_province_name
+        description: "State/province name."
+      - name: country_region_code
+        description: "ISO country/region code."
+      - name: postal_code
+        description: "Postal or ZIP code."
+
+  # ────────────────────────────────────────────────────────
+  # Product domain
+  # ────────────────────────────────────────────────────────
 
   - name: int_product_enriched
-    description: "Product + subcategory + category, with status flag."
+    description: >
+      One row per product — denormalises Product → ProductSubcategory →
+      ProductCategory and derives product_status. Feeds the snap_product snapshot.
     columns:
       - name: product_bk
+        description: "Product business key — PK."
         tests: [not_null, unique]
+      - name: product_name
+        description: "Product name."
+        tests: [not_null]
+      - name: product_number
+        description: "Product SKU — unique across all products."
+        tests: [not_null, unique]
+      - name: is_make
+        description: "True if manufactured in-house."
+      - name: is_finished_good
+        description: "True if the product is sold to customers."
+      - name: color
+        description: "Product colour (nullable)."
+      - name: product_line
+        description: "Product line code (R=Road, M=Mountain, T=Touring, S=Standard)."
+      - name: product_class
+        description: "Product class (H=High, M=Medium, L=Low)."
+      - name: product_style
+        description: "Product style (W=Womens, M=Mens, U=Universal)."
+      - name: size
+        description: "Product size."
+      - name: size_uom_code
+        description: "Unit of measure code for size."
+      - name: weight
+        description: "Product weight."
+      - name: weight_uom_code
+        description: "Unit of measure code for weight."
+      - name: standard_cost
+        description: "Standard manufacturing cost."
+      - name: list_price
+        description: "Current list price."
+      - name: days_to_manufacture
+        description: "Days required to manufacture the product."
+      - name: product_subcategory_bk
+        description: "FK to stg_product_subcategory. Null for uncategorised products."
+      - name: subcategory_name
+        description: "Subcategory name — 'Unassigned' when no subcategory exists."
+        tests: [not_null]
+      - name: product_category_bk
+        description: "FK to stg_product_category. Null for uncategorised products."
+      - name: category_name
+        description: "Category name — 'Unassigned' when no category exists."
+        tests: [not_null]
+      - name: sell_start_at
+        description: "Date the product became available for sale."
+      - name: sell_end_at
+        description: "Date the product was removed from sale. Null = still for sale."
+      - name: discontinued_at
+        description: "Date the product was discontinued. Null = not discontinued."
+      - name: product_status
+        description: "Derived status: Active, Inactive (past sell_end_at), or Discontinued."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["Active", "Inactive", "Discontinued"]
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
+
+  # ────────────────────────────────────────────────────────
+  # Employee domain
+  # ────────────────────────────────────────────────────────
 
   - name: int_employee_details
-    description: "Employee + person + current pay rate + current department."
+    description: >
+      One row per employee — joins Employee → Person for name fields, the most
+      recent pay rate from stg_employee_pay_history, and the current department
+      from stg_employee_dept_history (end_date is null). Feeds snap_employee.
     columns:
       - name: employee_bk
+        description: "Employee business key — PK."
         tests: [not_null, unique]
+      - name: full_name
+        description: "Full name from stg_person. Null if person record is missing."
+      - name: first_name
+        description: "First name from stg_person."
+      - name: last_name
+        description: "Last name from stg_person."
+      - name: login_id
+        description: "Network login ID."
+        tests: [not_null]
+      - name: national_id_number
+        description: "National identification number."
+      - name: job_title
+        description: "Job title."
+        tests: [not_null]
+      - name: organization_node
+        description: "Hierarchical position in the organisation."
+      - name: organization_level
+        description: "Depth in the organisation hierarchy."
+      - name: birth_date
+        description: "Date of birth."
+      - name: marital_status
+        description: "Marital status (M or S)."
+      - name: gender
+        description: "Gender (M or F)."
+      - name: hire_date
+        description: "Date the employee was hired."
+        tests: [not_null]
+      - name: is_salaried
+        description: "True if salaried (vs. hourly)."
+      - name: is_current
+        description: "True if currently active."
+      - name: vacation_hours
+        description: "Accrued vacation hours."
+      - name: sick_leave_hours
+        description: "Accrued sick leave hours."
+      - name: pay_rate
+        description: "Most recent pay rate from stg_employee_pay_history."
+      - name: pay_frequency
+        description: "Pay frequency of the most recent rate (1=Monthly, 2=Bi-weekly)."
+      - name: department_bk
+        description: "Current department ID from stg_employee_dept_history (end_date is null)."
+      - name: modified_at
+        description: "Timestamp of the last modification on the employee record."
+        tests: [not_null]
+
+  # ────────────────────────────────────────────────────────
+  # Sales domain
+  # ────────────────────────────────────────────────────────
 
   - name: int_territory_current
-    description: "SalesTerritory + current sales-person assignment."
+    description: >
+      One row per sales territory — enriches stg_sales_territory with the current
+      sales person assignment (most recent open history record). Feeds snap_salesterritory.
     columns:
       - name: sales_territory_bk
+        description: "Territory business key — PK."
         tests: [not_null, unique]
+      - name: territory_name
+        description: "Territory name."
+        tests: [not_null]
+      - name: country_region_code
+        description: "ISO country/region code."
+        tests: [not_null]
+      - name: territory_group
+        description: "Regional group (e.g. North America, Europe)."
+        tests: [not_null]
+      - name: sales_ytd
+        description: "Year-to-date sales amount for the territory."
+      - name: sales_last_year
+        description: "Prior year sales amount for the territory."
+      - name: cost_ytd
+        description: "Year-to-date cost for the territory."
+      - name: cost_last_year
+        description: "Prior year cost for the territory."
+      - name: current_sales_person_bk
+        description: "Sales person currently assigned to this territory. Null if unassigned."
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
 
   - name: int_sales_order_flag_combinations
-    description: "Distinct combinations of low-cardinality order flags. Backs dim_sales_order_junk."
+    description: >
+      Distinct combinations of low-cardinality order-header attributes —
+      order_status, is_online_order, revision_number, ship_method_name, card_type.
+      Implements the Kimball junk-dimension pattern; backs dim_sales_order_junk.
+      All values are coalesced so nulls do not create separate rows.
+    columns:
+      - name: order_status
+        description: "Order status label (coalesced to 'Unknown')."
+        tests: [not_null]
+      - name: is_online_order
+        description: "True if the order was placed online (coalesced to false)."
+        tests: [not_null]
+      - name: revision_number
+        description: "Order revision number (coalesced to 0)."
+        tests: [not_null]
+      - name: ship_method_name
+        description: "Shipping method name (coalesced to 'Unknown')."
+        tests: [not_null]
+      - name: card_type
+        description: "Credit card brand (coalesced to 'No Card' when no card)."
+        tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - order_status
+            - is_online_order
+            - revision_number
+            - ship_method_name
+            - card_type
 
   - name: int_sales_order_line_enriched
-    description: "Line + header attributes + allocated freight/tax."
+    description: >
+      One row per order line — denormalises detail + header into a single grain,
+      and pro-rates header-level semi-additive measures (freight, tax) to line
+      level proportionally by line_total. Feeds fct_sales_detail directly.
     columns:
       - name: sales_order_line_bk
+        description: "Order line business key — PK."
         tests: [not_null, unique]
       - name: sales_order_bk
+        description: "FK to stg_sales_order_header."
+        tests: [not_null]
+      - name: sales_order_detail_bk
+        description: "Detail business key within the order."
+        tests: [not_null]
+      - name: product_bk
+        description: "FK to stg_product."
+        tests: [not_null]
+      - name: special_offer_bk
+        description: "FK to stg_special_offer."
+        tests: [not_null]
+      - name: order_qty
+        description: "Quantity ordered."
+        tests: [not_null]
+      - name: unit_price
+        description: "Selling price per unit."
+        tests: [not_null]
+      - name: unit_price_discount
+        description: "Discount fraction applied to the unit price."
+        tests: [not_null]
+      - name: line_total
+        description: "Computed line total: qty × unit_price × (1 – discount)."
+        tests: [not_null]
+      - name: order_date
+        description: "Date the order was placed."
+        tests: [not_null]
+      - name: due_date
+        description: "Requested ship date."
+      - name: ship_date
+        description: "Actual ship date."
+      - name: order_status
+        description: "Order status label from the header."
+        tests: [not_null]
+      - name: is_online_order
+        description: "True if the order was placed online."
+        tests: [not_null]
+      - name: revision_number
+        description: "Number of times the order was revised."
         tests: [not_null]
       - name: customer_bk
+        description: "FK to stg_customer."
+        tests: [not_null]
+      - name: sales_person_bk
+        description: "FK to stg_sales_person. Null for online orders with no assigned rep."
+      - name: sales_territory_bk
+        description: "FK to stg_sales_territory."
+      - name: ship_method_bk
+        description: "FK to stg_ship_method."
+      - name: credit_card_bk
+        description: "FK to stg_credit_card. Null when no card was used."
+      - name: currency_rate_bk
+        description: "FK to stg_currency_rate. Null for USD orders."
+      - name: header_sub_total
+        description: "Order sub-total before tax and freight."
+        tests: [not_null]
+      - name: header_tax_amount
+        description: "Tax amount for the full order."
+        tests: [not_null]
+      - name: header_freight
+        description: "Freight cost for the full order."
+        tests: [not_null]
+      - name: header_total_due
+        description: "Total amount due for the full order."
+        tests: [not_null]
+      - name: allocated_freight
+        description: "Freight pro-rated to this line by its share of line_total."
+        tests: [not_null]
+      - name: allocated_tax
+        description: "Tax pro-rated to this line by its share of line_total."
+        tests: [not_null]
+      - name: modified_at
+        description: "Timestamp of the last modification on the detail row."
         tests: [not_null]
