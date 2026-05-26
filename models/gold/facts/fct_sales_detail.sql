@@ -12,14 +12,17 @@
 -- so each line references the version of customer/product/employee/territory
 -- that was current when the order was placed.
 with
+    {% if is_incremental() %}
+        max_date as (select max(order_date) as max_order_date from {{ this }}),
+    {% endif %}
+
     line as (
 
         select *
         from {{ ref("int_sales_order_line_enriched") }}
 
         {% if is_incremental() %}
-            where
-                order_date >= (select dateadd(day, -7, max(order_date)) from {{ this }})
+            where order_date >= (select dateadd(day, -7, max_order_date) from max_date)
         {% endif %}
 
     ),
@@ -42,8 +45,11 @@ select
     line.sales_order_line_bk,
 
     -- Date FKs (role-played x3)
+    line.order_date,
     cast(date_format(line.order_date, 'yyyyMMdd') as int) as order_date_sk,
+    line.due_date,
     cast(date_format(line.due_date, 'yyyyMMdd') as int) as due_date_sk,
+    line.ship_date,
     cast(date_format(line.ship_date, 'yyyyMMdd') as int) as ship_date_sk,
 
     -- Point-in-time SCD2 FKs

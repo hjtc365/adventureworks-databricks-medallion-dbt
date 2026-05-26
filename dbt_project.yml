@@ -32,9 +32,6 @@ models:
       relation: true
       columns: true
     # Config indicated by + and applies to all files under models/bronze/
-    bronze:
-      +schema: bronze        # routed by generate_schema_name macro
-      +materialized: table   # only seeds materialize here; sources are external
     silver:
       +schema: silver
       staging:
