@@ -8,6 +8,8 @@
 with
     d as (select * from {{ ref("stg_sales_order_detail") }}),
     h as (select * from {{ ref("stg_sales_order_header") }}),
+    sm as (select * from {{ ref("stg_ship_method") }}),
+    cc as (select * from {{ ref("stg_credit_card") }}),
     lt as (
         select sales_order_bk, sum(line_total) as header_line_total
         from d
@@ -36,7 +38,9 @@ select
     h.sales_person_bk,
     h.sales_territory_bk,
     h.ship_method_bk,
+    coalesce(sm.ship_method_name, 'Unknown') as ship_method_name,
     h.credit_card_bk,
+    coalesce(cc.card_type, 'No Card') as card_type,
     h.currency_rate_bk,
     h.sub_total as header_sub_total,
     h.tax_amount as header_tax_amount,
@@ -59,3 +63,5 @@ select
 from d
 inner join h on h.sales_order_bk = d.sales_order_bk
 left join lt on lt.sales_order_bk = d.sales_order_bk
+left join sm on sm.ship_method_bk = h.ship_method_bk
+left join cc on cc.credit_card_bk = h.credit_card_bk

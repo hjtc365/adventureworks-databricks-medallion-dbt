@@ -284,8 +284,14 @@ models:
         description: "FK to stg_sales_territory."
       - name: ship_method_bk
         description: "FK to stg_ship_method."
+      - name: ship_method_name
+        description: "Shipping method name resolved from stg_ship_method. Coalesced to 'Unknown' when no match."
+        tests: [not_null]
       - name: credit_card_bk
         description: "FK to stg_credit_card. Null when no card was used."
+      - name: card_type
+        description: "Credit card brand resolved from stg_credit_card. Coalesced to 'No Card' when no card was used."
+        tests: [not_null]
       - name: currency_rate_bk
         description: "FK to stg_currency_rate. Null for USD orders."
       - name: header_sub_total

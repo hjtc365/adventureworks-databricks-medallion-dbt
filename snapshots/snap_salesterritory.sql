@@ -2,7 +2,6 @@
 
     {{
         config(
-            target_schema="gold",
             unique_key="sales_territory_bk",
             strategy="check",
             check_cols=[

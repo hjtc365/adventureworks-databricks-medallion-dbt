@@ -2,7 +2,6 @@
 
     {{
         config(
-            target_schema="gold",
             unique_key="customer_bk",
             strategy="check",
             check_cols=["sales_territory_bk", "customer_type", "account_number"],

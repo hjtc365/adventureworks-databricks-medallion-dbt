@@ -30,9 +30,7 @@ with
     dim_salesterritory as (select * from {{ ref("dim_salesterritory") }}),
     dim_date as (select * from {{ ref("dim_date") }}),
     dim_special_offer as (select * from {{ ref("dim_special_offer") }}),
-    dim_sales_order_junk as (select * from {{ ref("dim_sales_order_junk") }}),
-    stg_ship_method as (select * from {{ ref("stg_ship_method") }}),
-    stg_credit_card as (select * from {{ ref("stg_credit_card") }})
+    dim_sales_order_junk as (select * from {{ ref("dim_sales_order_junk") }})
 
 select
     {{ dbt_utils.generate_surrogate_key(["line.sales_order_line_bk"]) }}
@@ -99,13 +97,10 @@ left join
 
 left join dim_special_offer dso on dso.special_offer_bk = line.special_offer_bk
 
-left join stg_ship_method sm on sm.ship_method_bk = line.ship_method_bk
-left join stg_credit_card cc on cc.credit_card_bk = line.credit_card_bk
-
 left join
     dim_sales_order_junk dj
     on dj.order_status = line.order_status
     and dj.is_online_order = line.is_online_order
     and dj.revision_number = line.revision_number
-    and dj.ship_method_name = coalesce(sm.ship_method_name, 'Unknown')
-    and dj.card_type = coalesce(cc.card_type, 'No Card')
+    and dj.ship_method_name = line.ship_method_name
+    and dj.card_type = line.card_type

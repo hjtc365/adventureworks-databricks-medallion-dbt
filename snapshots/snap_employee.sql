@@ -2,7 +2,6 @@
 
     {{
         config(
-            target_schema="gold",
             unique_key="employee_bk",
             strategy="check",
             check_cols=[

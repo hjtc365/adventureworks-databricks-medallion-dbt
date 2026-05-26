@@ -56,7 +56,7 @@ models:
 
 snapshots:
   adventureworks:
-    +target_schema: gold
+    +schema: gold
     +file_format: delta
     +strategy: check
     +invalidate_hard_deletes: true

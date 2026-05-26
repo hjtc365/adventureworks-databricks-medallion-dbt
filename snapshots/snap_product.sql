@@ -2,7 +2,6 @@
 
     {{
         config(
-            target_schema="gold",
             unique_key="product_bk",
             strategy="check",
             check_cols=[
