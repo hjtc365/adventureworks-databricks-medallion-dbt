@@ -181,6 +181,24 @@ models:
   # Sales domain
   # ────────────────────────────────────────────────────────
 
+  - name: stg_store
+    description: "Store (B2B dealer) master — deduplicated."
+    columns:
+      - name: store_bk
+        description: "Business entity ID, unique per store."
+        tests: [not_null, unique]
+      - name: store_name
+        description: "Store trading name."
+        tests: [not_null]
+      - name: sales_person_bk
+        description: "FK to stg_sales_person — the assigned sales rep. Null if unassigned."
+      - name: row_guid
+        description: "Globally unique identifier for the store."
+        tests: [not_null, unique]
+      - name: modified_at
+        description: "Timestamp of the last modification."
+        tests: [not_null]
+
   - name: stg_customer
     description: "Customer master — deduplicated. Typed as Individual, Store, or StoreContact."
     columns:

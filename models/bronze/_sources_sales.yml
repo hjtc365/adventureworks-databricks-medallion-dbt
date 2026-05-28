@@ -139,3 +139,16 @@ sources:
           - name: CardType
           - name: ExpMonth
           - name: ExpYear
+
+      - name: Store
+        description: "B2B store / dealer that buys through a sales person."
+        columns:
+          - name: BusinessEntityID
+            description: "PK — also FK to Person.BusinessEntity."
+            tests: [not_null, unique]
+          - name: Name
+            description: "Store name."
+          - name: SalesPersonID
+            description: "FK to SalesPerson — the assigned sales rep."
+          - name: rowguid
+          - name: ModifiedDate
