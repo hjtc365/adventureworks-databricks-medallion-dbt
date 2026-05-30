@@ -31,6 +31,11 @@ models:
       Includes a conformed Unknown member (product_sk = '-1', is_unknown = true,
       valid_from = '1900-01-01', valid_to = NULL) so fact FKs never dangle and
       the point-in-time predicate always finds it.
+    tests:
+      - test_scd2_no_date_overlap:
+          business_key: product_bk
+          valid_from: valid_from
+          valid_to: valid_to
     columns:
       - name: product_sk
         tests: [not_null, unique]
@@ -44,6 +49,11 @@ models:
       SCD2 employee dimension. Includes a conformed Unknown member
       (employee_sk = '-1', is_unknown = true) used by sales-line FKs when
       no rep is assigned.
+    tests:
+      - test_scd2_no_date_overlap:
+          business_key: employee_bk
+          valid_from: valid_from
+          valid_to: valid_to
     columns:
       - name: employee_sk
         tests: [not_null, unique]
@@ -56,6 +66,11 @@ models:
     description: |
       SCD2 sales territory dimension. Includes a conformed Unknown member
       (sales_territory_sk = '-1', is_unknown = true).
+    tests:
+      - test_scd2_no_date_overlap:
+          business_key: sales_territory_bk
+          valid_from: valid_from
+          valid_to: valid_to
     columns:
       - name: sales_territory_sk
         tests: [not_null, unique]
