@@ -21,20 +21,19 @@ select
     is_online_order,
     revision_number,
     ship_method_name,
-    card_type
+    card_type,
+    false as is_unknown
 from combos
 
 union all
 
--- explicit Unknown row for outer-join misses
+-- Conformed Unknown member (sk = '-1') for outer-join misses or unmatched
+-- combinations. Keeps the convention used across all dimensions.
 select
-    {{
-        dbt_utils.generate_surrogate_key(
-            ["'Unknown'", "false", "0", "'Unknown'", "'No Card'"]
-        )
-    }} as sales_order_junk_sk,
+    '-1' as sales_order_junk_sk,
     'Unknown' as order_status,
-    false as is_online_order,
-    0 as revision_number,
+    cast(null as boolean) as is_online_order,
+    cast(null as int) as revision_number,
     'Unknown' as ship_method_name,
-    'No Card' as card_type
+    'Unknown' as card_type,
+    true as is_unknown

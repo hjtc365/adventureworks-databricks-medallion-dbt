@@ -52,23 +52,31 @@ select
 
     -- Date FKs (role-played x3): stored as both a raw date (for readability)
     -- and an integer in yyyyMMdd format (for joining to dim_date).
+    -- All date SKs default to -1 (the dim_date Unknown member) when the
+    -- source date is missing, so fact FKs are never NULL.
     line.order_date,
-    cast(date_format(line.order_date, 'yyyyMMdd') as int) as order_date_sk,
+    coalesce(
+        cast(date_format(line.order_date, 'yyyyMMdd') as int), -1
+    ) as order_date_sk,
     line.due_date,
-    cast(date_format(line.due_date, 'yyyyMMdd') as int) as due_date_sk,
+    coalesce(
+        cast(date_format(line.due_date, 'yyyyMMdd') as int), -1
+    ) as due_date_sk,
     line.ship_date,
-    cast(date_format(line.ship_date, 'yyyyMMdd') as int) as ship_date_sk,
+    coalesce(
+        cast(date_format(line.ship_date, 'yyyyMMdd') as int), -1
+    ) as ship_date_sk,
 
     -- Point-in-time SCD2 FKs: resolved via the joins below using order_date
     -- so each line always references the dimension row that was active at
-    -- the time the order was placed.
-    dc.customer_sk,
-    dp.product_sk,
-    -- Sales person is optional; default to '_unknown' when no rep is assigned.
-    coalesce(de.employee_sk, '_unknown') as employee_sk,
-    dt.sales_territory_sk,
-    dso.special_offer_sk,
-    dj.sales_order_junk_sk,
+    -- the time the order was placed. Each FK is coalesced to the conformed
+    -- Unknown member ('-1') so fact rows never carry NULL FKs.
+    coalesce(dc.customer_sk, '-1') as customer_sk,
+    coalesce(dp.product_sk, '-1') as product_sk,
+    coalesce(de.employee_sk, '-1') as employee_sk,
+    coalesce(dt.sales_territory_sk, '-1') as sales_territory_sk,
+    coalesce(dso.special_offer_sk, '-1') as special_offer_sk,
+    coalesce(dj.sales_order_junk_sk, '-1') as sales_order_junk_sk,
 
     -- Additive measures: safe to SUM across any dimension slice.
     line.order_qty,
@@ -93,13 +101,12 @@ from line
 -- ── Point-in-time SCD2 joins ────────────────────────────────────────────────
 -- Each join matches the dimension row whose effective range (valid_from / valid_to)
 -- contains the order_date.  open-ended rows have valid_to = NULL, handled by
--- the "or dc.valid_to is null" predicate.
+-- the "or dt.valid_to is null" predicate.
 
-left join
-    dim_customer dc
-    on dc.customer_bk = line.customer_bk
-    and line.order_date >= dc.valid_from
-    and (line.order_date < dc.valid_to or dc.valid_to is null)
+-- dim_customer is Type 1 (current state only): a simple equi-join on
+-- customer_bk is sufficient. Customer's then-current territory is captured
+-- separately via the dim_salesterritory point-in-time join below.
+left join dim_customer dc on dc.customer_bk = line.customer_bk
 
 left join
     dim_product dp

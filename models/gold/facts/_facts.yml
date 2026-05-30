@@ -19,26 +19,31 @@ models:
               field: date_sk
       - name: customer_sk
         tests:
+          - not_null
           - relationships:
               to: ref('dim_customer')
               field: customer_sk
       - name: product_sk
         tests:
+          - not_null
           - relationships:
               to: ref('dim_product')
               field: product_sk
       - name: sales_territory_sk
         tests:
+          - not_null
           - relationships:
               to: ref('dim_salesterritory')
               field: sales_territory_sk
       - name: special_offer_sk
         tests:
+          - not_null
           - relationships:
               to: ref('dim_special_offer')
               field: special_offer_sk
       - name: sales_order_junk_sk
         tests:
+          - not_null
           - relationships:
               to: ref('dim_sales_order_junk')
               field: sales_order_junk_sk

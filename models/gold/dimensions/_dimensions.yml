@@ -3,50 +3,89 @@ version: 2
 models:
   - name: dim_customer
     description: |
-      SCD2 customer dimension. customer_sk = surrogate per (customer_bk, validity period).
-      `is_current` flag identifies the most recent version per customer.
+      Type 1 customer dimension (current state). Unifies Individual and Store
+      customers; `customer_name` is a coalesced label and `customer_type`
+      distinguishes the two sub-types. Address columns are prefixed `current_`
+      to make the Type 1 semantics explicit. Territory is intentionally NOT
+      carried here — it is resolved at order time via dim_salesterritory on
+      the fact, which avoids ambiguous "territory" filters in BI tools.
+      Includes a synthetic Unknown member (customer_sk = '-1') so fact FKs
+      never dangle.
     columns:
       - name: customer_sk
         tests: [not_null, unique]
       - name: customer_bk
+        tests: [not_null, unique]
+      - name: customer_type
+        tests:
+          - accepted_values:
+              values: ['Individual', 'Store', 'StoreContact', 'Unknown']
+      - name: customer_name
+        tests: [not_null]
+      - name: is_unknown
         tests: [not_null]
 
   - name: dim_product
-    description: "SCD2 product dimension with rolled-up category/subcategory."
+    description: |
+      SCD2 product dimension with rolled-up category/subcategory.
+      Includes a conformed Unknown member (product_sk = '-1', is_unknown = true,
+      valid_from = '1900-01-01', valid_to = NULL) so fact FKs never dangle and
+      the point-in-time predicate always finds it.
     columns:
       - name: product_sk
         tests: [not_null, unique]
       - name: product_bk
         tests: [not_null]
+      - name: is_unknown
+        tests: [not_null]
 
   - name: dim_employee
-    description: "SCD2 employee dimension."
+    description: |
+      SCD2 employee dimension. Includes a conformed Unknown member
+      (employee_sk = '-1', is_unknown = true) used by sales-line FKs when
+      no rep is assigned.
     columns:
       - name: employee_sk
         tests: [not_null, unique]
       - name: employee_bk
         tests: [not_null]
+      - name: is_unknown
+        tests: [not_null]
 
   - name: dim_salesterritory
-    description: "SCD2 sales territory dimension."
+    description: |
+      SCD2 sales territory dimension. Includes a conformed Unknown member
+      (sales_territory_sk = '-1', is_unknown = true).
     columns:
       - name: sales_territory_sk
         tests: [not_null, unique]
       - name: sales_territory_bk
         tests: [not_null]
+      - name: is_unknown
+        tests: [not_null]
 
   - name: dim_date
-    description: "Conformed date dimension, 2010-01-01 → 2030-12-31. SCD0."
+    description: |
+      Conformed date dimension, range derived dynamically from sales orders.
+      Includes a conformed Unknown member (date_sk = -1, is_unknown = true)
+      so fact date FKs are never NULL when an upstream date is missing.
     columns:
       - name: date_sk
         tests: [not_null, unique]
       - name: full_date
-        tests: [not_null, unique]
+        tests:
+          - unique
+          # full_date is NULL only on the Unknown member (date_sk = -1).
+          - not_null:
+              where: "date_sk <> -1"
+      - name: is_unknown
+        tests: [not_null]
 
   - name: dim_special_offer
     description: |
       Promotion / discount dimension (NOT a junk dim — it has its own attributes
-      and discount_pct drives revenue measures).
+      and discount_pct drives revenue measures). Includes a conformed Unknown
+      member (special_offer_sk = '-1', is_unknown = true).
     columns:
       - name: special_offer_sk
         tests: [not_null, unique]
@@ -61,9 +100,16 @@ models:
         tests:
           - accepted_values:
               values: ['No Discount', 'Low (<5%)', 'Medium (5-15%)', 'High (15-30%)', 'Deep (30%+)']
+      - name: is_unknown
+        tests: [not_null]
 
   - name: dim_sales_order_junk
-    description: "Junk dim collapsing 5 low-cardinality order flags into a single SK."
+    description: |
+      Junk dim collapsing 5 low-cardinality order flags into a single SK.
+      Includes a conformed Unknown member (sales_order_junk_sk = '-1',
+      is_unknown = true) for outer-join misses.
     columns:
       - name: sales_order_junk_sk
         tests: [not_null, unique]
+      - name: is_unknown
+        tests: [not_null]

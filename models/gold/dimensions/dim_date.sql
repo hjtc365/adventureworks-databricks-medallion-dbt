@@ -84,9 +84,11 @@ with
                 else null  -- unreachable; all 12 months are covered above
             end as fiscal_quarter
         from date_spine
-    )
+    ),
 
-select
+    real_dates as (
+
+        select
     -- ── Surrogate key
     -- ───────────────────────────────────────────────────────
     cast(date_format(date_day, 'yyyyMMdd') as int) as date_sk,
@@ -140,6 +142,47 @@ select
     -- ── Convenience flags
     -- ───────────────────────────────────────────────────
     date_day = last_day(date_day) as is_last_day_of_month,
-    month(date_day) = 12 and dayofmonth(date_day) = 31 as is_last_day_of_year
+    month(date_day) = 12 and dayofmonth(date_day) = 31 as is_last_day_of_year,
+    false as is_unknown
 
-from spine_with_fiscal
+        from spine_with_fiscal
+    ),
+
+    -- Conformed Unknown member (date_sk = -1). Use this when an upstream
+    -- date is missing rather than letting the FK be NULL.
+    unknown_member as (
+        select
+            cast(-1 as int) as date_sk,
+            cast(null as date) as full_date,
+            cast(null as int) as year_number,
+            cast(null as int) as quarter_number,
+            cast(null as string) as quarter_label,
+            cast(null as string) as quarter_name,
+            cast(null as int) as month_number,
+            cast(null as string) as month_name,
+            cast(null as string) as month_short_name,
+            cast(null as int) as week_of_year,
+            cast(null as int) as day_of_year,
+            cast(null as int) as day_of_month,
+            cast(null as int) as day_of_week,
+            cast(null as string) as day_name,
+            cast(null as string) as day_short_name,
+            cast(null as boolean) as is_weekend,
+            cast(null as int) as fiscal_year,
+            cast(null as int) as fiscal_quarter,
+            cast(null as string) as fiscal_quarter_label,
+            cast(null as string) as fiscal_year_quarter,
+            cast(null as date) as month_start_date,
+            cast(null as date) as month_end_date,
+            cast(null as date) as quarter_start_date,
+            cast(null as date) as quarter_end_date,
+            cast(null as date) as year_start_date,
+            cast(null as date) as year_end_date,
+            cast(null as boolean) as is_last_day_of_month,
+            cast(null as boolean) as is_last_day_of_year,
+            true as is_unknown
+    )
+
+select * from real_dates
+union all
+select * from unknown_member
