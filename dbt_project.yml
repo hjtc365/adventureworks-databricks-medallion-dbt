@@ -37,7 +37,7 @@ models:
       staging:
         +materialized: view
         # Two staging models are incremental — overridden in their own configs:
-        # stg_sales_order_header, stg_sales_order_detail, stg_product_inventory
+        # stg_sales_order_header, stg_sales_order_detail
       intermediate:
         +materialized: view
     gold:

@@ -73,54 +73,7 @@ models:
         description: "Timestamp of the last modification."
         tests: [not_null]
 
-  - name: stg_person_phone
-    description: "One row per phone number per person — deduplicated."
-    columns:
-      - name: person_bk
-        description: "Business entity ID — foreign key to stg_person."
-        tests:
-          - not_null
-          - relationships:
-              to: ref('stg_person')
-              field: person_bk
-      - name: phone_type_id
-        description: "Phone number type ID."
-        tests: [not_null]
-      - name: phone_number
-        description: "Phone number string."
-        tests: [not_null]
-      - name: modified_at
-        description: "Timestamp of the last modification."
-        tests: [not_null]
-    tests:
-      - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - person_bk
-            - phone_number
-            - phone_type_id
 
-  - name: stg_email_address
-    description: "One row per email address per person — deduplicated, lowercased and trimmed."
-    columns:
-      - name: email_address_bk
-        description: "Email address business key."
-        tests: [not_null, unique]
-      - name: person_bk
-        description: "Business entity ID — foreign key to stg_person."
-        tests:
-          - not_null
-          - relationships:
-              to: ref('stg_person')
-              field: person_bk
-      - name: email_address
-        description: "Email address, lowercased and trimmed."
-        tests: [not_null]
-      - name: row_guid
-        description: "Globally unique identifier for the email address."
-        tests: [not_null, unique]
-      - name: modified_at
-        description: "Timestamp of the last modification."
-        tests: [not_null]
 
   - name: stg_address
     description: "One row per address — deduplicated, cleansed."
@@ -455,33 +408,6 @@ models:
             - special_offer_bk
             - product_bk
 
-  - name: stg_currency_rate
-    description: "Daily currency exchange rates — deduplicated."
-    columns:
-      - name: currency_rate_bk
-        description: "Currency rate ID, business key."
-        tests: [not_null, unique]
-      - name: from_currency_code
-        description: "Source currency ISO code."
-        tests: [not_null]
-      - name: to_currency_code
-        description: "Target currency ISO code."
-        tests: [not_null]
-      - name: average_rate
-        description: "Average exchange rate for the day."
-        tests:
-          - not_null
-          - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
-      - name: end_of_day_rate
-        description: "End-of-day exchange rate."
-        tests:
-          - not_null
-          - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
-      - name: modified_at
-        description: "Timestamp of the last modification."
-        tests: [not_null]
 
   - name: stg_ship_method
     description: "Shipping method reference — deduplicated."
@@ -601,63 +527,7 @@ models:
         description: "Timestamp of the last modification."
         tests: [not_null]
 
-  - name: stg_product_list_price_history
-    description: "Historical list prices per product — deduplicated."
-    columns:
-      - name: product_bk
-        description: "FK to stg_product."
-        tests:
-          - not_null
-          - relationships:
-              to: ref('stg_product')
-              field: product_bk
-      - name: start_at
-        description: "Date the list price became effective."
-        tests: [not_null]
-      - name: end_at
-        description: "Date the list price was superseded. Null = current price."
-      - name: list_price
-        description: "List price effective during this period."
-        tests:
-          - not_null
-          - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
-      - name: modified_at
-        description: "Timestamp of the last modification."
-        tests: [not_null]
-    tests:
-      - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - product_bk
-            - start_at
 
-  - name: stg_product_inventory
-    description: "Current product inventory by location — incremental MERGE on product_bk + location_bk."
-    columns:
-      - name: product_bk
-        description: "FK to stg_product."
-        tests:
-          - not_null
-          - relationships:
-              to: ref('stg_product')
-              field: product_bk
-      - name: location_bk
-        description: "Location ID."
-        tests: [not_null]
-      - name: quantity
-        description: "Quantity on hand."
-        tests:
-          - not_null
-          - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
-      - name: modified_at
-        description: "Timestamp of the last modification."
-        tests: [not_null]
-    tests:
-      - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - product_bk
-            - location_bk
 
   # ────────────────────────────────────────────────────────
   # HumanResources domain
