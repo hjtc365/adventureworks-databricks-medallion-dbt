@@ -116,16 +116,6 @@ sources:
           - name: ProductID
             tests: [not_null]
 
-      - name: CurrencyRate
-        columns:
-          - name: CurrencyRateID
-            tests: [not_null, unique]
-          - name: CurrencyRateDate
-          - name: FromCurrencyCode
-          - name: ToCurrencyCode
-          - name: AverageRate
-          - name: EndOfDayRate
-
       - name: ShipMethod
         columns:
           - name: ShipMethodID

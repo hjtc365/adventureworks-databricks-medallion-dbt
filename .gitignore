@@ -4,4 +4,5 @@ dbt_packages/
 logs/
 .venv/
 .vscode/
+.github/
 resources/

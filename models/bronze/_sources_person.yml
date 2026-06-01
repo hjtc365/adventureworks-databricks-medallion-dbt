@@ -1,9 +1,9 @@
 version: 2
 
 # Person domain Bronze sources.
-# NOTE on delimiters: Person, PersonPhone, EmailAddress are PIPE-DELIMITED ('+|')
-# with a row terminator of '&|\n' to avoid collisions with embedded XML and
-# free-text content. Address and StateProvince are tab-delimited.
+# NOTE on delimiters: Person and BusinessEntityAddress are PIPE-DELIMITED ('+|')
+# to avoid collisions with embedded XML / free-text. Address and StateProvince
+# are tab-delimited.
 
 sources:
   - name: person
@@ -31,24 +31,6 @@ sources:
             description: "XML — load as STRING in Databricks."
           - name: Demographics
             description: "XML — load as STRING in Databricks."
-          - name: rowguid
-          - name: ModifiedDate
-
-      - name: PersonPhone
-        columns:
-          - name: BusinessEntityID
-            tests: [not_null]
-          - name: PhoneNumber
-          - name: PhoneNumberTypeID
-          - name: ModifiedDate
-
-      - name: EmailAddress
-        columns:
-          - name: BusinessEntityID
-            tests: [not_null]
-          - name: EmailAddressID
-            tests: [not_null]
-          - name: EmailAddress
           - name: rowguid
           - name: ModifiedDate
 

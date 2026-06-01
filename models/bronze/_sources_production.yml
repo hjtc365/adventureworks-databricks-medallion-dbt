@@ -53,24 +53,4 @@ sources:
             tests: [not_null, unique]
           - name: Name
 
-      - name: ProductListPriceHistory
-        columns:
-          - name: ProductID
-            tests: [not_null]
-          - name: StartDate
-            tests: [not_null]
-          - name: EndDate
-          - name: ListPrice
-          - name: ModifiedDate
 
-      - name: ProductInventory
-        columns:
-          - name: ProductID
-            tests: [not_null]
-          - name: LocationID
-            tests: [not_null]
-          - name: Shelf
-          - name: Bin
-          - name: Quantity
-          - name: rowguid
-          - name: ModifiedDate
