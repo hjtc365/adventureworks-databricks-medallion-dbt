@@ -6,17 +6,48 @@ models:
       Sales fact at order-line grain. Joins to SCD2 dimensions are
       point-in-time using order_date. Header-level amounts (freight, tax)
       are allocated proportionally to line_total.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - sales_order_bk
+            - sales_order_detail_bk
     columns:
       - name: sales_order_line_sk
         tests: [not_null, unique]
       - name: sales_order_bk
         tests: [not_null]
+      - name: sales_order_line_bk
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_match_regex:
+              regex: '^\d+-\d+$'
+      - name: order_date
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: "'1990-01-01'"
+              max_value: "'2030-12-31'"
+              row_condition: "order_date is not null"
       - name: order_date_sk
         tests:
           - not_null
           - relationships:
               to: ref('dim_date')
               field: date_sk
+      - name: ship_date_sk
+        tests:
+          - relationships:
+              to: ref('dim_date')
+              field: date_sk
+              config:
+                where: "ship_date_sk <> -1"
+      - name: due_date_sk
+        tests:
+          - relationships:
+              to: ref('dim_date')
+              field: date_sk
+              config:
+                where: "due_date_sk <> -1"
       - name: customer_sk
         tests:
           - not_null
@@ -49,9 +80,37 @@ models:
               field: sales_order_junk_sk
       - name: order_qty
         tests:
+          - not_null
           - dbt_expectations.expect_column_values_to_be_between:
               min_value: 1
-      - name: line_total
+      - name: unit_price
         tests:
+          - not_null
           - dbt_expectations.expect_column_values_to_be_between:
               min_value: 0
+      - name: unit_price_discount
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 1
+      - name: line_total
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: allocated_freight
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: allocated_tax
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: line_total_with_overhead
+        tests:
+          - not_null
+          - dbt_utils.expression_is_true:
+              expression: ">= line_total"

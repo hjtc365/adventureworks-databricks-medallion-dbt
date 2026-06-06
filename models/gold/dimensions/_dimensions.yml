@@ -24,6 +24,9 @@ models:
         tests: [not_null]
       - name: is_unknown
         tests: [not_null]
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "customer_bk is not null or is_unknown = true"
 
   - name: dim_product
     description: |
@@ -41,6 +44,18 @@ models:
         tests: [not_null, unique]
       - name: product_bk
         tests: [not_null]
+      - name: valid_from
+        tests: [not_null]
+      - name: list_price
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              row_condition: "is_unknown = false"
+      - name: standard_cost
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              row_condition: "is_unknown = false"
       - name: is_unknown
         tests: [not_null]
 
@@ -93,6 +108,24 @@ models:
           # full_date is NULL only on the Unknown member (date_sk = -1).
           - not_null:
               where: "date_sk <> -1"
+      - name: year_number
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1990
+              max_value: 2030
+              row_condition: "is_unknown = false"
+      - name: month_number
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+              max_value: 12
+              row_condition: "is_unknown = false"
+      - name: day_of_month
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+              max_value: 31
+              row_condition: "is_unknown = false"
       - name: is_unknown
         tests: [not_null]
 

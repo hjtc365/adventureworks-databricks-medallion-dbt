@@ -191,7 +191,11 @@ models:
         tests: [not_null, unique]
       - name: sales_order_number
         description: "Human-readable order number (e.g. SO43659)."
-        tests: [not_null, unique]
+        tests:
+          - not_null
+          - unique
+          - dbt_expectations.expect_column_values_to_match_regex:
+              regex: '^SO\d+$'
       - name: order_date
         description: "Date the order was placed."
         tests: [not_null]
@@ -231,9 +235,27 @@ models:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
               min_value: 0
+      - name: ship_date
+        description: "Date the order was shipped. Null if not yet shipped."
+        tests:
+          - dbt_expectations.expect_column_pair_values_a_to_be_greater_than_b:
+              column_A: ship_date
+              column_B: order_date
+              or_equal: true
+              row_condition: "ship_date is not null"
+      - name: due_date
+        description: "Date the order is due. Must be on or after order_date."
+        tests:
+          - dbt_expectations.expect_column_pair_values_a_to_be_greater_than_b:
+              column_A: due_date
+              column_B: order_date
+              or_equal: true
       - name: modified_at
         description: "Timestamp of the last modification."
         tests: [not_null]
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "total_due >= 0"
 
   - name: stg_sales_order_detail
     description: "Order line items — incremental MERGE on composite line key."
@@ -488,6 +510,8 @@ models:
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
               min_value: 0
+          - dbt_utils.expression_is_true:
+              expression: "standard_cost <= list_price or list_price = 0"
       - name: product_subcategory_bk
         description: "FK to stg_product_subcategory. Null for uncategorised products."
       - name: modified_at
