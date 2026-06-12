@@ -5,7 +5,8 @@ with
 
     versions as (
         select
-            {{ dbt_utils.generate_surrogate_key(["dbt_scd_id"]) }} as sales_territory_sk,
+            {{ dbt_utils.generate_surrogate_key(["dbt_scd_id"]) }}
+            as sales_territory_sk,
             sales_territory_bk,
             territory_name,
             country_region_code,
@@ -40,6 +41,8 @@ with
             true as is_unknown
     )
 
-select * from versions
+select *
+from versions
 union all
-select * from unknown_member
+select *
+from unknown_member

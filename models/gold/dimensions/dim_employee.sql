@@ -26,7 +26,9 @@ with
             is_current,
             dbt_valid_from as valid_from,
             dbt_valid_to as valid_to,
-            case when dbt_valid_to is null then true else false end as is_current_version,
+            case
+                when dbt_valid_to is null then true else false
+            end as is_current_version,
             false as is_unknown
         from snap
     ),
@@ -61,6 +63,8 @@ with
             true as is_unknown
     )
 
-select * from versions
+select *
+from versions
 union all
-select * from unknown_member
+select *
+from unknown_member

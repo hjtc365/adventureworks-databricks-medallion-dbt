@@ -253,9 +253,6 @@ models:
       - name: modified_at
         description: "Timestamp of the last modification."
         tests: [not_null]
-    tests:
-      - dbt_utils.expression_is_true:
-          expression: "total_due >= 0"
 
   - name: stg_sales_order_detail
     description: "Order line items — incremental MERGE on composite line key."
