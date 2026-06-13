@@ -1,71 +1,358 @@
 version: 2
 
-# Person domain Bronze sources.
-# NOTE on delimiters: Person and BusinessEntityAddress are PIPE-DELIMITED ('+|')
-# to avoid collisions with embedded XML / free-text. Address and StateProvince
-# are tab-delimited.
+# ─────────────────────────────────────────────────────────────────────────────
+# Person domain — Bronze sources (AdventureWorks)
+#
+# DELIMITER NOTES
+#   Person, BusinessEntityAddress  → PIPE-DELIMITED ('+|') to avoid collisions
+#                                    with embedded XML / free-text fields.
+#   Address, StateProvince         → TAB-DELIMITED
+#   BusinessEntity                 → TAB-DELIMITED (minimal table, no free-text)
+#
+# SUPERTYPE / SUBTYPE PATTERN
+#   BusinessEntity is the identity supertype: every Person, Store, and Vendor
+#   shares the same BusinessEntityID pool. Address, phone, email, and contact
+#   tables all hang off BusinessEntityID so they work for any entity type
+#   without duplication. See docs/patterns/supertype_subtype.md for details.
+# ─────────────────────────────────────────────────────────────────────────────
 
 sources:
   - name: person
-    description: "AdventureWorks Person domain — individuals, contact info, addresses."
+    description: >
+      AdventureWorks Person domain — individuals, contact information, and
+      addresses. Covers the supertype/subtype identity pattern where
+      BusinessEntity is the root identity shared by Person, Store, and Vendor.
     database: "{{ 'adventureworks_prod' if target.name == 'prod' else 'adventureworks_dev' }}"
     schema: bronze
     loaded_at_field: ModifiedDate
+    tags:
+      - person_domain
+      - bronze
+      - adventureworks
+
+    freshness:
+      warn_after: { count: 24, period: hour }
+      error_after: { count: 48, period: hour }
 
     tables:
+
+      # ───────────────────────────────────────────────────────────────────────
+      # BusinessEntity — identity supertype
+      # Every Person, Store, and Vendor row has a matching row here first.
+      # This is the root of the supertype/subtype pattern: shared tables
+      # (Address, Phone, Email, Contact) all join via BusinessEntityID so they
+      # work for any entity type without schema duplication.
+      # ───────────────────────────────────────────────────────────────────────
+      - name: BusinessEntity
+        description: >
+          Identity supertype for all named entities in the system (Person,
+          Store, Vendor). A row is inserted here before any subtype row is
+          created, giving every entity a globally unique BusinessEntityID.
+          Shared contact tables (Address, Phone, Email, Contact) all reference
+          this ID, so they serve all entity types without duplication.
+        tags: [supertype, identity]
+        columns:
+          - name: BusinessEntityID
+            description: >
+              Surrogate primary key. Auto-incremented on insert. All subtype
+              tables (Person, Store, Vendor) use this same value as their own PK,
+              creating a one-to-one shared-key relationship.
+            tests:
+              - not_null
+              - unique
+          - name: rowguid
+            description: >
+              GUID for replication and row-level identification across
+              distributed systems. Load as STRING (UNIQUEIDENTIFIER in source).
+          - name: ModifiedDate
+            description: "Timestamp of the last modification. Source timezone: UTC."
+            tests:
+              - not_null
+
+      # ───────────────────────────────────────────────────────────────────────
+      # Person — subtype of BusinessEntity
+      # Stores human-specific attributes. Every row here has a matching
+      # BusinessEntity row with the same ID.
+      # DELIMITER: PIPE ('+|') — AdditionalContactInfo and Demographics are XML
+      # blobs that contain commas and tabs, so standard delimiters collide.
+      # ───────────────────────────────────────────────────────────────────────
       - name: Person
-        description: "Individual people — customers, employees, vendor contacts."
+        description: >
+          Subtype of BusinessEntity representing a human individual — employees,
+          customers, or vendor contacts. BusinessEntityID is both the PK of
+          this table and a FK to BusinessEntity, enforcing a strict one-to-one
+          relationship. Load with PIPE delimiter ('+|').
+        tags: [subtype, pii, pipe_delimited]
         columns:
           - name: BusinessEntityID
-            tests: [not_null, unique]
+            description: >
+              PK and FK to BusinessEntity.BusinessEntityID. Must exist in
+              BusinessEntity before a Person row can be inserted (FK constraint).
+            tests:
+              - not_null
+              - unique
+              - relationships:
+                  to: source('person', 'BusinessEntity')
+                  field: BusinessEntityID
+
           - name: PersonType
-            description: "EM=Employee, SC=Store contact, IN=Individual customer, etc."
-          - name: NameStyle
-          - name: Title
-          - name: FirstName
-          - name: MiddleName
-          - name: LastName
-          - name: Suffix
-          - name: EmailPromotion
-          - name: AdditionalContactInfo
-            description: "XML — load as STRING in Databricks."
-          - name: Demographics
-            description: "XML — load as STRING in Databricks."
-          - name: rowguid
-          - name: ModifiedDate
+            description: >
+              Two-letter code classifying the person's primary role.
+              Valid values:
+                SC = Store contact
+                IN = Individual (retail) customer
+                SP = Sales person
+                EM = Employee (non-sales)
+                VC = Vendor contact
+                GC = General contact
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ['SC', 'IN', 'SP', 'EM', 'VC', 'GC']
 
+          - name: NameStyle
+            description: >
+              Controls the display order of name parts.
+              0 = Western order (FirstName LastName)
+              1 = Eastern order (LastName FirstName)
+              Cast to BOOLEAN in silver.
+            tests:
+              - accepted_values:
+                  values: [0, 1]
+
+          - name: Title
+            description: "Courtesy title — e.g. Mr., Ms., Dr., Sr. Nullable."
+
+          - name: FirstName
+            description: "Given name. PII — mask in non-prod environments."
+            tests:
+              - not_null
+
+          - name: MiddleName
+            description: "Middle name or initial. Nullable."
+
+          - name: LastName
+            description: "Family name / surname. PII — mask in non-prod environments."
+            tests:
+              - not_null
+
+          - name: Suffix
+            description: "Name suffix — e.g. Jr., III, PhD. Nullable."
+
+          - name: EmailPromotion
+            description: >
+              Consent level for marketing email.
+              0 = No email
+              1 = Adventure Works only
+              2 = Adventure Works and selected partners
+            tests:
+              - not_null
+              - accepted_values:
+                  values: [0, 1, 2]
+
+          - name: AdditionalContactInfo
+            description: >
+              Unstructured XML blob with supplementary contact details (extra
+              phones, fax, social handles). Load as STRING in Databricks —
+              do NOT attempt XML parsing at the bronze layer. Parse in silver
+              using from_xml() or a dedicated flattening model.
+
+          - name: Demographics
+            description: >
+              XML blob with customer survey / demographic data (income,
+              hobbies, number of cars, etc.). Load as STRING in Databricks.
+              Parse in silver — schema varies across rows.
+
+          - name: rowguid
+            description: "GUID for replication. Load as STRING."
+
+          - name: ModifiedDate
+            description: "UTC timestamp of last update."
+            tests:
+              - not_null
+
+      # ───────────────────────────────────────────────────────────────────────
+      # Address — physical / mailing addresses
+      # Shared across all entity types via BusinessEntityAddress (the junction
+      # table). One Address row can be linked to multiple entities.
+      # DELIMITER: TAB
+      # ───────────────────────────────────────────────────────────────────────
       - name: Address
+        description: >
+          Physical and mailing addresses. Not directly linked to any entity
+          type — instead, BusinessEntityAddress is the junction that connects
+          an address to a Person, Store, or Vendor with a typed relationship
+          (e.g. Billing, Shipping, Home). One Address row can be reused across
+          multiple entities. Load with TAB delimiter.
+        tags: [shared, pii, tab_delimited]
         columns:
           - name: AddressID
-            tests: [not_null, unique]
-          - name: AddressLine1
-          - name: AddressLine2
-          - name: City
-          - name: StateProvinceID
-          - name: PostalCode
-          - name: SpatialLocation
-            description: "geography type — load as STRING."
-          - name: rowguid
-          - name: ModifiedDate
+            description: "Surrogate PK. Auto-incremented."
+            tests:
+              - not_null
+              - unique
 
+          - name: AddressLine1
+            description: "Primary street address. PII — mask in non-prod."
+            tests:
+              - not_null
+
+          - name: AddressLine2
+            description: "Apartment, suite, floor, etc. Nullable."
+
+          - name: City
+            description: "City name."
+            tests:
+              - not_null
+
+          - name: StateProvinceID
+            description: "FK to StateProvince.StateProvinceID."
+            tests:
+              - not_null
+              - relationships:
+                  to: source('person', 'StateProvince')
+                  field: StateProvinceID
+
+          - name: PostalCode
+            description: >
+              Postal / ZIP code. Stored as STRING — some codes have leading
+              zeros (e.g. US ZIP 02134) or contain letters (e.g. Canadian
+              postal codes like M5V 2T6).
+            tests:
+              - not_null
+
+          - name: SpatialLocation
+            description: >
+              Geography / geometry type from SQL Server. Represents the
+              lat/long of the address. Load as STRING in Databricks — parse
+              with ST_GeomFromWKB() or equivalent in silver if needed.
+
+          - name: rowguid
+            description: "GUID for replication. Load as STRING."
+
+          - name: ModifiedDate
+            description: "UTC timestamp of last update."
+            tests:
+              - not_null
+
+      # ───────────────────────────────────────────────────────────────────────
+      # StateProvince — reference / lookup table
+      # DELIMITER: TAB
+      # ───────────────────────────────────────────────────────────────────────
       - name: StateProvince
+        description: >
+          Reference table for states, provinces, and territories. Used to
+          normalize geographic data on Address rows. Also carries the
+          TerritoryID linking to the Sales domain's SalesTerritory table.
+          Load with TAB delimiter.
+        tags: [reference, tab_delimited]
+        freshness:
+          warn_after: { count: 7, period: day }
+          error_after: { count: 30, period: day }
         columns:
           - name: StateProvinceID
-            tests: [not_null, unique]
-          - name: StateProvinceCode
-          - name: CountryRegionCode
-          - name: IsOnlyStateProvinceFlag
-          - name: Name
-          - name: TerritoryID
+            description: "Surrogate PK."
+            tests:
+              - not_null
+              - unique
 
+          - name: StateProvinceCode
+            description: >
+              ISO 3166-2 subdivision code — e.g. 'WA' for Washington,
+              'ON' for Ontario. Always 3 characters or fewer.
+            tests:
+              - not_null
+
+          - name: CountryRegionCode
+            description: >
+              ISO 3166-1 alpha-2 country code — e.g. 'US', 'CA', 'GB'.
+              FK to Sales.CountryRegion in the source system (not modelled
+              here in the Person domain bronze layer).
+            tests:
+              - not_null
+
+          - name: IsOnlyStateProvinceFlag
+            description: >
+              1 if this is the only state/province for its country (i.e. the
+              country has no subdivisions for shipping purposes), 0 otherwise.
+              Cast to BOOLEAN in silver.
+            tests:
+              - not_null
+              - accepted_values:
+                  values: [0, 1]
+
+          - name: Name
+            description: "Full English name of the state or province."
+            tests:
+              - not_null
+
+          - name: TerritoryID
+            description: >
+              FK to Sales.SalesTerritory.TerritoryID. Used to roll up
+              geographic performance by sales region. Join in the Sales
+              domain models, not here.
+            tests:
+              - not_null
+              - relationships:
+                  to: source('sales', 'SalesTerritory')
+                  field: TerritoryID
+
+          - name: rowguid
+            description: "GUID for replication. Load as STRING."
+
+          - name: ModifiedDate
+            description: "UTC timestamp of last update."
+            tests:
+              - not_null
+
+      # ───────────────────────────────────────────────────────────────────────
+      # BusinessEntityAddress — junction table
+      # Links any BusinessEntity (Person, Store, Vendor) to one or more
+      # Address rows, with a type describing the relationship.
+      # DELIMITER: PIPE ('+|') — consistent with Person to simplify ingestion.
+      # ───────────────────────────────────────────────────────────────────────
       - name: BusinessEntityAddress
-        description: "Links a person (BusinessEntityID) to one or more addresses with an address type."
+        description: >
+          Junction table that links a BusinessEntity (Person, Store, or Vendor)
+          to one or more physical addresses. The AddressTypeID qualifies the
+          relationship — e.g. Billing, Shipping, Home, Main Office. A single
+          entity can have multiple address rows of different types. Load with
+          PIPE delimiter ('+|').
+        tags: [junction, pipe_delimited]
         columns:
           - name: BusinessEntityID
-            tests: [not_null]
+            description: >
+              FK to BusinessEntity.BusinessEntityID. Identifies which entity
+              (person, store, or vendor) owns this address link.
+            tests:
+              - not_null
+              - relationships:
+                  to: source('person', 'BusinessEntity')
+                  field: BusinessEntityID
+
           - name: AddressID
-            tests: [not_null]
+            description: "FK to Address.AddressID."
+            tests:
+              - not_null
+              - relationships:
+                  to: source('person', 'Address')
+                  field: AddressID
+
           - name: AddressTypeID
-            tests: [not_null]
+            description: >
+              FK to Person.AddressType.AddressTypeID (not modelled as a
+              separate bronze source here — values are small and stable).
+              Common values: 1=Billing, 2=Home, 3=Main Office, 4=Primary,
+              5=Shipping, 6=Archive.
+            tests:
+              - not_null
+              - accepted_values:
+                  values: [1, 2, 3, 4, 5, 6]
+
           - name: rowguid
+            description: "GUID for replication. Load as STRING."
+
           - name: ModifiedDate
+            description: "UTC timestamp of last update."
+            tests:
+              - not_null

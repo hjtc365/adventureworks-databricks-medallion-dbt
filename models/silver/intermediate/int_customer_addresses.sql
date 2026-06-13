@@ -1,8 +1,21 @@
 {{ config(materialized="view") }}
 
--- Joins customers to their primary address for use in dim_customer.
--- Uses Person.BusinessEntityAddress to resolve PersonID -> AddressID.
--- Address type ordering: Billing (1) preferred, then by most recently modified.
+-- Resolves each customer's single best address for use in dim_customer.
+--
+-- Join path:
+-- stg_customer -> stg_person (via person_bk)
+-- -> stg_business_entity (via business_entity_bk)
+-- -> stg_business_entity_address (via business_entity_bk)
+-- -> stg_address (via address_bk)
+-- -> stg_state_province (via state_province_bk)
+--
+-- Address selection: one row per customer via ROW_NUMBER().
+-- Priority 1 — address_type_id ASC (Billing = 1 ranked first)
+-- Priority 2 — modified_at DESC (most recently updated wins on tie)
+--
+-- Note: LEFT JOINs are used throughout because not all customers have
+-- a linked Person or registered address (e.g. B2B store-only customers).
+-- Such customers will produce a single row with all address fields NULL.
 with
     customer as (select * from {{ ref("stg_customer") }}),
 
@@ -12,8 +25,10 @@ with
 
     state_province as (select * from {{ ref("stg_state_province") }}),
 
+    business_entity as (select * from {{ ref("stg_business_entity") }}),
+
     business_entity_address as (select * from {{ ref("stg_business_entity_address") }}),
-                        
+
     customer_address as (
         select
             c.customer_bk,
@@ -31,7 +46,10 @@ with
             ) as _rn
         from customer c
         left join person p on p.person_bk = c.person_bk
-        left join business_entity_address bea on bea.business_entity_bk = p.person_bk
+        left join business_entity be on be.business_entity_bk = p.person_bk
+        left join
+            business_entity_address bea
+            on bea.business_entity_bk = be.business_entity_bk
         left join addr a on a.address_bk = bea.address_bk
         left join state_province sp on sp.state_province_bk = a.state_province_bk
     )

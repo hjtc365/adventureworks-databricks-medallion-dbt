@@ -1,10 +1,34 @@
 {{ config(materialized="view") }}
 
--- Joins each order line back to its header to expose header-level
--- attributes (dates, customer, territory, ship/payment) needed by
--- fct_sales_detail without requiring a re-join in every downstream model.
--- Also computes allocated semi-additive measures for header-level amounts
--- (freight, tax) so they can be summed at line grain without double-counting.
+-- Enriches each order line with its parent header attributes and allocated
+-- semi-additive measures for use in fct_sales_detail.
+--
+-- Join path:
+--   stg_sales_order_detail -> stg_sales_order_header (via sales_order_bk)
+--                          -> stg_ship_method        (via ship_method_bk)
+--                          -> stg_credit_card        (via credit_card_bk)
+--                          -> lt (line total CTE)    (via sales_order_bk)
+--
+-- Header attributes brought to line grain:
+--   Dates       — order_date, due_date, ship_date
+--   Flags       — order_status, is_online_order, revision_number
+--   FKs         — customer_bk, sales_person_bk, sales_territory_bk,
+--                 ship_method_bk, credit_card_bk, currency_rate_bk
+--   Amounts     — header_sub_total, header_tax_amount, header_freight,
+--                 header_total_due (prefixed to signal header grain)
+--
+-- Semi-additive allocation (freight and tax):
+--   freight and tax_amount are header-level amounts that would double-count
+--   if summed naively across lines. Both are allocated proportionally to
+--   each line's share of header_line_total:
+--     allocated = header_amount * (line_total / header_line_total)
+--   Edge case: if header_line_total = 0 (fully discounted order), allocated
+--   values default to 0 to avoid division by zero.
+--
+-- Note: INNER JOIN to stg_sales_order_header since a detail row without a
+-- header is an orphan and should not reach the fact table. All other joins
+-- are LEFT to preserve lines where ship method or credit card is not set
+-- (e.g. cash orders, internally fulfilled lines).
 with
     d as (select * from {{ ref("stg_sales_order_detail") }}),
     h as (select * from {{ ref("stg_sales_order_header") }}),

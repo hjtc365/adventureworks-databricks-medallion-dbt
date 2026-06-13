@@ -9,48 +9,109 @@ sources:
 
     tables:
       - name: Product
-        description: "Product master."
+        description: "Product master containing all products sold or used in manufacturing."
         columns:
           - name: ProductID
+            description: "Primary key for the product record."
             tests: [not_null, unique]
           - name: Name
+            description: "Name of the product."
           - name: ProductNumber
+            description: "Unique product identification number."
             tests: [not_null]
           - name: MakeFlag
+            description: "0 = Product is purchased, 1 = Product is manufactured in-house."
+            tests:
+              - accepted_values:
+                  values: [0, 1]
           - name: FinishedGoodsFlag
+            description: "0 = Product is not a salable item, 1 = Product is salable."
+            tests:
+              - accepted_values:
+                  values: [0, 1]
           - name: Color
+            description: "Product color. NULL if not applicable."
           - name: SafetyStockLevel
+            description: "Minimum inventory quantity that triggers a reorder."
           - name: ReorderPoint
+            description: "Inventory level that triggers a purchase order or work order."
           - name: StandardCost
+            description: "Standard cost of the product."
           - name: ListPrice
+            description: "Selling price of the product."
           - name: Size
+            description: "Product size. NULL if not applicable."
           - name: SizeUnitMeasureCode
+            description: "Foreign key to UnitMeasure. Unit of measure for Size."
           - name: WeightUnitMeasureCode
+            description: "Foreign key to UnitMeasure. Unit of measure for Weight."
           - name: Weight
+            description: "Product weight. NULL if not applicable."
           - name: DaysToManufacture
+            description: "Number of days required to manufacture the product."
           - name: ProductLine
+            description: "Product line designation. R = Road, M = Mountain, T = Touring, S = Standard."
+            tests:
+              - accepted_values:
+                  values: ['R', 'M', 'T', 'S']
           - name: Class
+            description: "Product class. H = High, M = Medium, L = Low."
+            tests:
+              - accepted_values:
+                  values: ['H', 'M', 'L']
           - name: Style
+            description: "Product style. W = Womens, M = Mens, U = Universal."
+            tests:
+              - accepted_values:
+                  values: ['W', 'M', 'U']
           - name: ProductSubcategoryID
+            description: "Foreign key to ProductSubcategory. NULL if not categorised."
+            tests:
+              - relationships:
+                  to: source('production', 'ProductSubcategory')
+                  field: ProductSubcategoryID
           - name: ProductModelID
+            description: "Foreign key to ProductModel. NULL if no model assigned."
           - name: SellStartDate
+            description: "Date the product was available for sale."
           - name: SellEndDate
+            description: "Date the product was no longer available for sale. NULL if still active."
           - name: DiscontinuedDate
+            description: "Date the product was discontinued. NULL if still active."
           - name: rowguid
+            description: "ROWGUIDCOL number uniquely identifying the record."
           - name: ModifiedDate
+            description: "Date and time the record was last updated."
 
       - name: ProductSubcategory
+        description: "Second-level product classification beneath ProductCategory."
         columns:
           - name: ProductSubcategoryID
+            description: "Primary key for the product subcategory record."
             tests: [not_null, unique]
           - name: ProductCategoryID
-            tests: [not_null]
+            description: "Foreign key to ProductCategory.ProductCategoryID."
+            tests:
+              - not_null
+              - relationships:
+                  to: source('production', 'ProductCategory')
+                  field: ProductCategoryID
           - name: Name
+            description: "Subcategory description."
+          - name: rowguid
+            description: "ROWGUIDCOL number uniquely identifying the record."
+          - name: ModifiedDate
+            description: "Date and time the record was last updated."
 
       - name: ProductCategory
+        description: "Top-level product classification grouping product subcategories."
         columns:
           - name: ProductCategoryID
+            description: "Primary key for the product category record."
             tests: [not_null, unique]
           - name: Name
-
-
+            description: "Category description."
+          - name: rowguid
+            description: "ROWGUIDCOL number uniquely identifying the record."
+          - name: ModifiedDate
+            description: "Date and time the record was last updated."

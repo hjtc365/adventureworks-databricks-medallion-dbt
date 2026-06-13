@@ -1,6 +1,26 @@
 {{ config(materialized="view") }}
 
--- Joins Employee → Person → current pay rate for use in dim_employee.
+-- Enriches each employee with personal details, current pay rate, and current
+-- department for use in dim_employee.
+--
+-- Join path:
+--   stg_employee -> stg_person (via person_bk = employee_bk)
+--               -> stg_employee_pay_history  (via employee_bk)
+--               -> stg_employee_dept_history (via employee_bk)
+--
+-- Current pay rate: one row per employee via ROW_NUMBER().
+--   Priority — rate_change_at DESC (most recent rate wins)
+--
+-- Current department: one row per employee via ROW_NUMBER().
+--   Filter  — end_date IS NULL (open-ended assignments only)
+--   Priority — start_date DESC (most recent open assignment wins)
+--
+-- Note: LEFT JOINs are used throughout because:
+--   - stg_person: contractors or test employees may lack a Person record
+--   - stg_employee_pay_history: new employees may not yet have a pay record
+--   - stg_employee_dept_history: employees may not yet be assigned a department
+--   Missing records produce NULLs in the respective fields rather than
+--   dropping the employee row.
 with
     e as (select * from {{ ref("stg_employee") }}),
     p as (select * from {{ ref("stg_person") }}),

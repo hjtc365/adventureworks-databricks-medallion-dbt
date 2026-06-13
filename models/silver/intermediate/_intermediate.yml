@@ -7,30 +7,42 @@ models:
 
   - name: int_customer_addresses
     description: >
-      One row per customer — joins each customer to their single primary address
-      via BusinessEntityAddress. Address type preference: Billing (type 1) first,
-      then most recently modified. Customers with no address record still appear
-      (all address columns will be null).
+      One row per customer — resolves each customer's single best address via
+      ROW_NUMBER() over BusinessEntityAddress. Address type priority: Billing (type 1)
+      ranked first; ties broken by most recently modified address. Walk path:
+      stg_customer → stg_person → stg_business_entity →
+      stg_business_entity_address → stg_address → stg_state_province.
+      All joins are LEFT so customers with no Person or no address record are
+      retained with all address columns NULL.
     columns:
       - name: customer_bk
-        description: "Customer business key — PK, from stg_customer."
-        tests: [not_null, unique]
+        description: "Customer business key — PK. Guaranteed one row per customer by ROW_NUMBER()=1 filter."
+        tests:
+          - not_null
+          - unique
+          - relationships:
+              to: ref('stg_customer')
+              field: customer_bk
       - name: address_bk
-        description: "Address business key. Null when the customer has no linked address."
+        description: "Address business key. Null when the customer has no linked address. FK to stg_address for non-null values."
+        tests:
+          - relationships:
+              to: ref('stg_address')
+              field: address_bk
       - name: address_line_1
-        description: "First line of the primary address. Null when no address is resolved."
+        description: "First line of the street address. Null when no address is resolved (e.g. store-only B2B customers)."
       - name: address_line_2
-        description: "Second line of the primary address (optional)."
+        description: "Second line of the street address (apartment, suite, floor, etc.). Optional — null when not provided."
       - name: city
-        description: "City of the primary address."
+        description: "City name of the primary address."
       - name: state_province_code
-        description: "ISO state/province code."
+        description: "ISO 3166-2 subdivision code (e.g. 'WA', 'ON')."
       - name: state_province_name
-        description: "State/province name."
+        description: "Full English name of the state or province."
       - name: country_region_code
-        description: "ISO country/region code."
+        description: "ISO 3166-1 alpha-2 country code (e.g. 'US', 'CA', 'GB')."
       - name: postal_code
-        description: "Postal or ZIP code."
+        description: "Postal or ZIP code. Stored as STRING — may contain leading zeros or letters (e.g. Canadian codes)."
 
   # ────────────────────────────────────────────────────────
   # Product domain
@@ -38,69 +50,103 @@ models:
 
   - name: int_product_enriched
     description: >
-      One row per product — denormalises Product → ProductSubcategory →
-      ProductCategory and derives product_status. Feeds the snap_product snapshot.
+      One row per product — denormalises the three-level hierarchy
+      (stg_product → stg_product_subcategory → stg_product_category) into a
+      flat row, and derives product_status from sell/discontinue dates.
+      LEFT JOINs are used because not all products have a subcategory or category
+      (e.g. raw materials, internal components); missing names default to
+      'Unassigned'. Feeds the snap_product snapshot.
     columns:
       - name: product_bk
         description: "Product business key — PK."
-        tests: [not_null, unique]
+        tests:
+          - not_null
+          - unique
+          - relationships:
+              to: ref('stg_product')
+              field: product_bk
       - name: product_name
-        description: "Product name."
+        description: "Name of the product."
         tests: [not_null]
       - name: product_number
-        description: "Product SKU — unique across all products."
+        description: "Unique product identification number (SKU)."
         tests: [not_null, unique]
       - name: is_make
-        description: "True if manufactured in-house."
+        description: "True if manufactured in-house; false if purchased externally."
       - name: is_finished_good
-        description: "True if the product is sold to customers."
+        description: "True if the product is salable to customers; false if internal/component."
       - name: color
-        description: "Product colour (nullable)."
+        description: "Product colour. Null if not applicable."
       - name: product_line
-        description: "Product line code (R=Road, M=Mountain, T=Touring, S=Standard)."
+        description: "Product line designation. R=Road, M=Mountain, T=Touring, S=Standard. Null if not assigned."
       - name: product_class
-        description: "Product class (H=High, M=Medium, L=Low)."
+        description: "Product class. H=High, M=Medium, L=Low. Null if not assigned."
       - name: product_style
-        description: "Product style (W=Womens, M=Mens, U=Universal)."
+        description: "Product style. W=Womens, M=Mens, U=Universal. Null if not assigned."
       - name: size
-        description: "Product size."
+        description: "Product size. Null if not applicable."
       - name: size_uom_code
-        description: "Unit of measure code for size."
+        description: "FK to UnitMeasure — unit of measure for Size."
       - name: weight
-        description: "Product weight."
+        description: "Product weight. Null if not applicable."
       - name: weight_uom_code
-        description: "Unit of measure code for weight."
+        description: "FK to UnitMeasure — unit of measure for Weight."
       - name: standard_cost
-        description: "Standard manufacturing cost."
+        description: "Standard manufacturing or purchasing cost."
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
       - name: list_price
-        description: "Current list price."
+        description: "Selling price of the product."
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
       - name: days_to_manufacture
-        description: "Days required to manufacture the product."
+        description: "Number of days required to manufacture the product."
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
       - name: product_subcategory_bk
         description: "FK to stg_product_subcategory. Null for uncategorised products."
       - name: subcategory_name
-        description: "Subcategory name — 'Unassigned' when no subcategory exists."
+        description: "Subcategory description. Defaulted to 'Unassigned' via COALESCE when no subcategory is linked."
         tests: [not_null]
       - name: product_category_bk
         description: "FK to stg_product_category. Null for uncategorised products."
       - name: category_name
-        description: "Category name — 'Unassigned' when no category exists."
+        description: "Category description. Defaulted to 'Unassigned' via COALESCE when no category is linked."
         tests: [not_null]
       - name: sell_start_at
-        description: "Date the product became available for sale."
+        description: "Date the product was first available for sale."
+        tests: [not_null]
       - name: sell_end_at
         description: "Date the product was removed from sale. Null = still for sale."
+        tests:
+          - dbt_expectations.expect_column_pair_values_a_to_be_greater_than_b:
+              column_A: sell_end_at
+              column_B: sell_start_at
+              or_equal: true
+              row_condition: "sell_end_at is not null"
       - name: discontinued_at
-        description: "Date the product was discontinued. Null = not discontinued."
+        description: "Date the product was discontinued. Null = not discontinued. When set, product_status = 'Discontinued'."
       - name: product_status
-        description: "Derived status: Active, Inactive (past sell_end_at), or Discontinued."
+        description: >
+          Derived lifecycle status: 'Discontinued' when discontinued_at is set,
+          'Inactive' when sell_end_at is in the past, 'Active' otherwise.
         tests:
           - not_null
           - accepted_values:
               values: ["Active", "Inactive", "Discontinued"]
       - name: modified_at
-        description: "Timestamp of the last modification."
+        description: "Timestamp of the last modification on the product record."
         tests: [not_null]
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "discontinued_at is null or product_status = 'Discontinued'"
+          name: product_status_discontinued_when_discontinued_at_set
+      - dbt_utils.expression_is_true:
+          expression: "standard_cost <= list_price or list_price = 0"
+          name: standard_cost_not_greater_than_list_price
 
   # ────────────────────────────────────────────────────────
   # Employee domain
@@ -108,57 +154,90 @@ models:
 
   - name: int_employee_details
     description: >
-      One row per employee — joins Employee → Person for name fields, the most
-      recent pay rate from stg_employee_pay_history, and the current department
-      from stg_employee_dept_history (end_date is null). Feeds snap_employee.
+      One row per employee — enriches stg_employee with personal name fields
+      from stg_person (LEFT JOIN — contractors may have no Person record), the
+      most recent pay rate from stg_employee_pay_history (ROW_NUMBER() on
+      rate_change_at DESC), and the current department from
+      stg_employee_dept_history (end_date IS NULL, ROW_NUMBER() on start_date
+      DESC). All enrichment joins are LEFT so employees without pay records or
+      department assignments are retained with those fields NULL. Feeds
+      snap_employee.
     columns:
       - name: employee_bk
         description: "Employee business key — PK."
-        tests: [not_null, unique]
+        tests:
+          - not_null
+          - unique
+          - relationships:
+              to: ref('stg_employee')
+              field: employee_bk
       - name: full_name
-        description: "Full name from stg_person. Null if person record is missing."
+        description: "Derived full name (firstname + middlename + lastname + suffix) from stg_person. Null if the employee has no linked Person record."
       - name: first_name
-        description: "First name from stg_person."
+        description: "Given name from stg_person. PII — mask in non-prod."
       - name: last_name
-        description: "Last name from stg_person."
+        description: "Family name from stg_person. PII — mask in non-prod."
       - name: login_id
-        description: "Network login ID."
+        description: "Network login name of the employee."
         tests: [not_null]
       - name: national_id_number
-        description: "National identification number."
+        description: "Unique national identification number (e.g. SSN). PII — mask in non-prod."
       - name: job_title
-        description: "Job title."
+        description: "Work title of the employee."
         tests: [not_null]
       - name: organization_node
-        description: "Hierarchical position in the organisation."
+        description: "Hierarchyid position in the org tree, loaded as STRING. Null for the root node (CEO)."
       - name: organization_level
-        description: "Depth in the organisation hierarchy."
+        description: "Integer depth in the org hierarchy (0 = root). Null for the CEO."
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              row_condition: "organization_level is not null"
       - name: birth_date
-        description: "Date of birth."
+        description: "Date of birth. PII — mask in non-prod."
       - name: marital_status
-        description: "Marital status (M or S)."
+        description: "Marital status. M = Married, S = Single."
       - name: gender
-        description: "Gender (M or F)."
+        description: "Gender. M = Male, F = Female."
       - name: hire_date
         description: "Date the employee was hired."
         tests: [not_null]
       - name: is_salaried
-        description: "True if salaried (vs. hourly)."
+        description: "True if the employee is salaried; false if hourly."
       - name: is_current
-        description: "True if currently active."
+        description: "True if the employee is currently active; false if inactive."
       - name: vacation_hours
-        description: "Accrued vacation hours."
+        description: "Number of available vacation hours."
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              row_condition: "vacation_hours is not null"
       - name: sick_leave_hours
-        description: "Accrued sick leave hours."
+        description: "Number of available sick leave hours."
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              row_condition: "sick_leave_hours is not null"
       - name: pay_rate
-        description: "Most recent pay rate from stg_employee_pay_history."
+        description: "Most recent hourly or salaried pay rate from stg_employee_pay_history. Null if no pay record exists."
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              row_condition: "pay_rate is not null"
       - name: pay_frequency
-        description: "Pay frequency of the most recent rate (1=Monthly, 2=Bi-weekly)."
+        description: "Pay frequency of the most recent rate. 1 = Monthly, 2 = Bi-weekly. Null if no pay record exists."
       - name: department_bk
-        description: "Current department ID from stg_employee_dept_history (end_date is null)."
+        description: "Current department ID from stg_employee_dept_history where end_date IS NULL. Null if the employee has no active department assignment."
       - name: modified_at
         description: "Timestamp of the last modification on the employee record."
         tests: [not_null]
+    tests:
+      - dbt_expectations.expect_column_pair_values_a_to_be_greater_than_b:
+          column_A: hire_date
+          column_B: birth_date
+          or_equal: false
+          row_condition: "birth_date is not null"
+          name: hire_date_after_birth_date
 
   # ────────────────────────────────────────────────────────
   # Sales domain
@@ -167,55 +246,92 @@ models:
   - name: int_territory_current
     description: >
       One row per sales territory — enriches stg_sales_territory with the current
-      sales person assignment (most recent open history record). Feeds snap_salesterritory.
+      assigned sales person from stg_sales_territory_history (end_at IS NULL,
+      ROW_NUMBER() on start_at DESC to handle rare simultaneous open assignments).
+      LEFT JOIN preserves territories with no active assignment
+      (current_sales_person_bk = NULL). Feeds snap_salesterritory.
     columns:
       - name: sales_territory_bk
         description: "Territory business key — PK."
-        tests: [not_null, unique]
+        tests:
+          - not_null
+          - unique
+          - relationships:
+              to: ref('stg_sales_territory')
+              field: sales_territory_bk
       - name: territory_name
-        description: "Territory name."
+        description: "Sales territory description."
         tests: [not_null]
       - name: country_region_code
-        description: "ISO country/region code."
+        description: "ISO 3166-1 alpha-2 country code for the territory."
         tests: [not_null]
       - name: territory_group
-        description: "Regional group (e.g. North America, Europe)."
+        description: "Geographic group the territory belongs to (e.g. North America, Europe, Pacific)."
         tests: [not_null]
       - name: sales_ytd
-        description: "Year-to-date sales amount for the territory."
+        description: "Sales in the territory year to date."
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              row_condition: "sales_ytd is not null"
       - name: sales_last_year
-        description: "Prior year sales amount for the territory."
+        description: "Sales in the territory for the prior year."
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              row_condition: "sales_last_year is not null"
       - name: cost_ytd
-        description: "Year-to-date cost for the territory."
+        description: "Business costs in the territory year to date."
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              row_condition: "cost_ytd is not null"
       - name: cost_last_year
-        description: "Prior year cost for the territory."
+        description: "Business costs in the territory for the prior year."
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              row_condition: "cost_last_year is not null"
       - name: current_sales_person_bk
-        description: "Sales person currently assigned to this territory. Null if unassigned."
+        description: "FK to stg_sales_person — the sales person with the most recent open territory assignment. Null for unassigned or retired territories."
+        tests:
+          - relationships:
+              to: ref('stg_sales_person')
+              field: sales_person_bk
       - name: modified_at
-        description: "Timestamp of the last modification."
+        description: "Timestamp of the last modification on the territory record."
         tests: [not_null]
 
   - name: int_sales_order_flag_combinations
     description: >
-      Distinct combinations of low-cardinality order-header attributes —
-      order_status, is_online_order, revision_number, ship_method_name, card_type.
-      Implements the Kimball junk-dimension pattern; backs dim_sales_order_junk.
-      All values are coalesced so nulls do not create separate rows.
+      Distinct combinations of low-cardinality order-header attributes that
+      implement the Kimball junk-dimension pattern; backs dim_sales_order_junk.
+      Resolves ship_method_name and card_type via LEFT JOINs to stg_ship_method
+      and stg_credit_card respectively. All five attributes are COALESCE-defaulted
+      before DISTINCT so that NULLs do not create spurious extra combinations:
+      order_status→'Unknown', is_online_order→false, revision_number→0,
+      ship_method_name→'Unknown', card_type→'No Card'.
     columns:
       - name: order_status
-        description: "Order status label (coalesced to 'Unknown')."
-        tests: [not_null]
+        description: "Order status label. COALESCE default: 'Unknown'."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["In process", "Approved", "Backordered", "Rejected", "Shipped", "Cancelled", "Unknown"]
       - name: is_online_order
-        description: "True if the order was placed online (coalesced to false)."
+        description: "True if the order was placed online by the customer; false if placed by a sales person. COALESCE default: false."
         tests: [not_null]
       - name: revision_number
-        description: "Order revision number (coalesced to 0)."
-        tests: [not_null]
+        description: "Number of times the order was revised. COALESCE default: 0."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
       - name: ship_method_name
-        description: "Shipping method name (coalesced to 'Unknown')."
+        description: "Shipping company name resolved from stg_ship_method. COALESCE default: 'Unknown'."
         tests: [not_null]
       - name: card_type
-        description: "Credit card brand (coalesced to 'No Card' when no card)."
+        description: "Credit card brand resolved from stg_credit_card. COALESCE default: 'No Card'."
         tests: [not_null]
     tests:
       - dbt_utils.unique_combination_of_columns:
@@ -228,90 +344,164 @@ models:
 
   - name: int_sales_order_line_enriched
     description: >
-      One row per order line — denormalises detail + header into a single grain,
-      and pro-rates header-level semi-additive measures (freight, tax) to line
-      level proportionally by line_total. Feeds fct_sales_detail directly.
+      One row per order line — INNER JOINs detail to its header (orphan lines are
+      excluded), then LEFT JOINs stg_ship_method and stg_credit_card for resolved
+      names (defaulting to 'Unknown'/'No Card'). Allocates header-level
+      semi-additive measures (freight, tax) proportionally to each line by its
+      share of the order's total line_total. Edge case: if header_line_total = 0
+      (fully discounted order), allocated values default to 0. Feeds
+      fct_sales_detail directly.
     columns:
       - name: sales_order_line_bk
-        description: "Order line business key — PK."
+        description: "Composite business key (SalesOrderID-SalesOrderDetailID) — PK."
         tests: [not_null, unique]
       - name: sales_order_bk
-        description: "FK to stg_sales_order_header."
-        tests: [not_null]
+        description: "FK to stg_sales_order_header — INNER JOIN so every line is guaranteed a parent header."
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_sales_order_header')
+              field: sales_order_bk
       - name: sales_order_detail_bk
-        description: "Detail business key within the order."
+        description: "Sequential detail ID within the order."
         tests: [not_null]
       - name: product_bk
         description: "FK to stg_product."
-        tests: [not_null]
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_product')
+              field: product_bk
       - name: special_offer_bk
         description: "FK to stg_special_offer."
-        tests: [not_null]
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_special_offer')
+              field: special_offer_bk
       - name: order_qty
-        description: "Quantity ordered."
-        tests: [not_null]
+        description: "Quantity ordered per product. Must be at least 1."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
       - name: unit_price
-        description: "Selling price per unit."
-        tests: [not_null]
+        description: "Selling price of a single product unit."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
       - name: unit_price_discount
-        description: "Discount fraction applied to the unit price."
-        tests: [not_null]
+        description: "Discount applied as a decimal fraction (0.0 – 1.0)."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              max_value: 1
       - name: line_total
-        description: "Computed line total: qty × unit_price × (1 – discount)."
-        tests: [not_null]
+        description: "Computed line total: order_qty × unit_price × (1 – unit_price_discount)."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
       - name: order_date
         description: "Date the order was placed."
         tests: [not_null]
       - name: due_date
-        description: "Requested ship date."
+        description: "Date the order is due to the customer. Must be on or after order_date."
+        tests:
+          - dbt_expectations.expect_column_pair_values_a_to_be_greater_than_b:
+              column_A: due_date
+              column_B: order_date
+              or_equal: true
+              row_condition: "due_date is not null"
       - name: ship_date
-        description: "Actual ship date."
+        description: "Actual ship date. Null if the order has not yet shipped. Must be on or after order_date when set."
+        tests:
+          - dbt_expectations.expect_column_pair_values_a_to_be_greater_than_b:
+              column_A: ship_date
+              column_B: order_date
+              or_equal: true
+              row_condition: "ship_date is not null"
       - name: order_status
-        description: "Order status label from the header."
+        description: "Human-readable order status label carried from the header."
         tests: [not_null]
       - name: is_online_order
-        description: "True if the order was placed online."
+        description: "True if the order was placed online by the customer."
         tests: [not_null]
       - name: revision_number
         description: "Number of times the order was revised."
-        tests: [not_null]
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
       - name: customer_bk
         description: "FK to stg_customer."
-        tests: [not_null]
+        tests:
+          - not_null
+          - relationships:
+              to: ref('stg_customer')
+              field: customer_bk
       - name: sales_person_bk
-        description: "FK to stg_sales_person. Null for online orders with no assigned rep."
+        description: "FK to stg_sales_person. Null for online orders with no assigned sales rep."
+        tests:
+          - relationships:
+              to: ref('stg_sales_person')
+              field: sales_person_bk
       - name: sales_territory_bk
         description: "FK to stg_sales_territory."
+        tests:
+          - relationships:
+              to: ref('stg_sales_territory')
+              field: sales_territory_bk
       - name: ship_method_bk
         description: "FK to stg_ship_method."
       - name: ship_method_name
-        description: "Shipping method name resolved from stg_ship_method. Coalesced to 'Unknown' when no match."
+        description: "Shipping company name resolved from stg_ship_method. COALESCE default: 'Unknown'."
         tests: [not_null]
       - name: credit_card_bk
-        description: "FK to stg_credit_card. Null when no card was used."
+        description: "FK to stg_credit_card. Null when no credit card was used."
       - name: card_type
-        description: "Credit card brand resolved from stg_credit_card. Coalesced to 'No Card' when no card was used."
+        description: "Credit card brand resolved from stg_credit_card. COALESCE default: 'No Card'."
         tests: [not_null]
       - name: currency_rate_bk
-        description: "FK to stg_currency_rate. Null for USD orders."
+        description: "FK to currency rate. Null for USD orders (no conversion required)."
       - name: header_sub_total
-        description: "Order sub-total before tax and freight."
-        tests: [not_null]
+        description: "Order sub-total (sum of line totals) before tax and freight. Prefixed 'header_' to signal header grain."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
       - name: header_tax_amount
-        description: "Tax amount for the full order."
-        tests: [not_null]
+        description: "Tax amount for the full order (header grain)."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
       - name: header_freight
-        description: "Freight cost for the full order."
-        tests: [not_null]
+        description: "Shipping cost for the full order (header grain)."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
       - name: header_total_due
-        description: "Total amount due for the full order."
-        tests: [not_null]
+        description: "Total amount due for the full order: sub_total + tax + freight (header grain)."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
       - name: allocated_freight
-        description: "Freight pro-rated to this line by its share of line_total."
-        tests: [not_null]
+        description: "Freight pro-rated to this line by (line_total / header_line_total). Zero when the header is fully discounted."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
       - name: allocated_tax
-        description: "Tax pro-rated to this line by its share of line_total."
-        tests: [not_null]
+        description: "Tax pro-rated to this line by (line_total / header_line_total). Zero when the header is fully discounted."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
       - name: modified_at
         description: "Timestamp of the last modification on the detail row."
         tests: [not_null]

@@ -1,7 +1,22 @@
 {{ config(materialized="view") }}
 
--- Denormalises Product → ProductSubcategory → ProductCategory.
--- This is the single source for dim_product (snapshot).
+-- Denormalises the three-level product hierarchy into a single flat row
+-- per product for use as the source of the dim_product snapshot.
+--
+-- Join path:
+--   stg_product -> stg_product_subcategory (via product_subcategory_bk)
+--              -> stg_product_category     (via product_category_bk)
+--
+-- Note: LEFT JOINs are used because not all products are assigned a
+-- subcategory or category (e.g. raw materials, internal components).
+-- Missing names default to 'Unassigned' via COALESCE rather than
+-- dropping the product row.
+--
+-- product_status is a derived field computed here once so dim_product
+-- does not need to re-implement the logic:
+--   'Discontinued' — discontinued_at IS NOT NULL
+--   'Inactive'     — sell_end_at is set and in the past
+--   'Active'       — all other products
 with
     p as (select * from {{ ref("stg_product") }}),
     s as (select * from {{ ref("stg_product_subcategory") }}),

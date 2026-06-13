@@ -17,42 +17,99 @@ sources:
         description: "Employee master with org-hierarchy and pay info."
         columns:
           - name: BusinessEntityID
-            tests: [not_null, unique]
+            description: "Primary key. Foreign key to Person.BusinessEntityID."
+            tests:
+              - not_null
+              - unique
+              - relationships:
+                  to: source('person', 'BusinessEntity')
+                  field: BusinessEntityID
           - name: NationalIDNumber
+            description: "Unique national identification number such as a social security number."
           - name: LoginID
+            description: "Network login name of the employee."
           - name: OrganizationNode
-            description: "hierarchyid — load as STRING."
+            description: "hierarchyid — load as STRING. Position in the org hierarchy; NULL for the root (CEO)."
           - name: OrganizationLevel
             description: "INT depth (0 = root). Pre-computed in CSV. NULL for CEO."
           - name: JobTitle
+            description: "Work title of the employee."
           - name: BirthDate
+            description: "Date of birth of the employee."
           - name: MaritalStatus
+            description: "Marital status of the employee. M = Married, S = Single."
+            tests:
+              - accepted_values:
+                  values: ['M', 'S']
           - name: Gender
+            description: "Gender of the employee. M = Male, F = Female."
+            tests:
+              - accepted_values:
+                  values: ['M', 'F']
           - name: HireDate
+            description: "Date the employee was hired."
           - name: SalariedFlag
+            description: "1 = Salaried employee. 0 = Hourly employee."
+            tests:
+              - accepted_values:
+                  values: [0, 1]
           - name: VacationHours
+            description: "Number of available vacation hours."
           - name: SickLeaveHours
+            description: "Number of available sick leave hours."
           - name: CurrentFlag
+            description: "1 = Active employee. 0 = Inactive employee."
+            tests:
+              - accepted_values:
+                  values: [0, 1]
           - name: rowguid
+            description: "ROWGUIDCOL number uniquely identifying the record."
           - name: ModifiedDate
+            description: "Date and time the record was last updated."
 
       - name: EmployeePayHistory
+        description: "History of employee pay rates and frequency changes over time."
         columns:
           - name: BusinessEntityID
-            tests: [not_null]
+            description: "Foreign key to Employee.BusinessEntityID."
+            tests:
+              - not_null
+              - relationships:
+                  to: source('humanresources', 'Employee')
+                  field: BusinessEntityID
           - name: RateChangeDate
+            description: "Date the pay rate change took effect. Part of composite PK."
             tests: [not_null]
           - name: Rate
+            description: "Salary hourly rate."
           - name: PayFrequency
+            description: "Payment frequency. 1 = Monthly, 2 = Biweekly."
+            tests:
+              - accepted_values:
+                  values: [1, 2]
           - name: ModifiedDate
+            description: "Date and time the record was last updated."
 
       - name: EmployeeDepartmentHistory
+        description: "History of employee department and shift assignments over time."
         columns:
           - name: BusinessEntityID
-            tests: [not_null]
+            description: "Foreign key to Employee.BusinessEntityID. Part of composite PK."
+            tests:
+              - not_null
+              - relationships:
+                  to: source('humanresources', 'Employee')
+                  field: BusinessEntityID
           - name: DepartmentID
+            description: "Foreign key to Department.DepartmentID. Part of composite PK."
             tests: [not_null]
           - name: ShiftID
+            description: "Foreign key to Shift.ShiftID. Part of composite PK."
+            tests: [not_null]
           - name: StartDate
+            description: "Date the employee started in the department and shift. Part of composite PK."
+            tests: [not_null]
           - name: EndDate
+            description: "Date the employee left the department. NULL if currently assigned."
           - name: ModifiedDate
+            description: "Date and time the record was last updated."

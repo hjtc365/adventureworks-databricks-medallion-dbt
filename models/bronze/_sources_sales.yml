@@ -1,7 +1,7 @@
 version: 2
 
 # Bronze sources for the Sales domain.
-# All tables are external Delta tables created in Databricks via COPY INTO
+# All tables are external Delta tables created in Databricks
 # from raw AdventureWorks CSV exports. dbt does not own the load — sources
 # are read-only references for Silver staging models.
 
@@ -10,7 +10,7 @@ sources:
     description: "AdventureWorks Sales domain — raw OLTP CSV exports landed in Bronze."
     database: "{{ 'adventureworks_prod' if target.name == 'prod' else 'adventureworks_dev' }}"
     schema: bronze
-    loader: databricks_copy_into
+    loader: databricks_bronze_bootstrap_notebook
     loaded_at_field: ModifiedDate
 
     freshness:
@@ -26,119 +26,343 @@ sources:
             tests: [not_null, unique]
           - name: PersonID
             description: "FK to Person — null for store-only customers."
+            tests:
+              - relationships:
+                  to: source('person', 'Person')
+                  field: BusinessEntityID
           - name: StoreID
             description: "FK to Store — null for individual customers."
+            tests:
+              - relationships:
+                  to: source('sales', 'Store')
+                  field: BusinessEntityID
           - name: TerritoryID
             description: "FK to SalesTerritory."
+            tests:
+              - relationships:
+                  to: source('sales', 'SalesTerritory')
+                  field: TerritoryID
           - name: AccountNumber
             description: "Pre-computed string 'AW' + 8-digit padded CustomerID. Present verbatim in the CSV."
           - name: rowguid
+            description: "ROWGUIDCOL number uniquely identifying the record."
           - name: ModifiedDate
+            description: "Date and time the record was last updated."
 
       - name: SalesOrderHeader
         description: "One row per sales order."
         columns:
           - name: SalesOrderID
+            description: "Primary key for the sales order."
             tests: [not_null, unique]
+          - name: RevisionNumber
+            description: "Incremental number to track changes to the sales order over time."
+          - name: OrderDate
+            description: "Date the order was placed."
+          - name: DueDate
+            description: "Date the order is due to the customer."
+          - name: ShipDate
+            description: "Date the order was shipped to the customer."
+          - name: Status
+            description: "Order status. 1=In process, 2=Approved, 3=Backordered, 4=Rejected, 5=Shipped, 6=Cancelled."
+            tests:
+              - accepted_values:
+                  values: [1, 2, 3, 4, 5, 6]
+          - name: OnlineOrderFlag
+            description: "0 = Order placed by sales person, 1 = Order placed online by customer."
+            tests:
+              - accepted_values:
+                  values: [0, 1]
           - name: SalesOrderNumber
             description: "Pre-computed 'SO' + SalesOrderID. Present verbatim in the CSV."
+          - name: PurchaseOrderNumber
+            description: "Customer purchase order number reference."
+          - name: AccountNumber
+            description: "Financial accounting number reference."
+          - name: CustomerID
+            description: "FK to Customer.CustomerID."
+            tests:
+              - relationships:
+                  to: source('sales', 'Customer')
+                  field: CustomerID
+          - name: SalesPersonID
+            description: "FK to SalesPerson. NULL for online orders."
+            tests:
+              - relationships:
+                  to: source('sales', 'SalesPerson')
+                  field: BusinessEntityID
+          - name: TerritoryID
+            description: "FK to SalesTerritory."
+            tests:
+              - relationships:
+                  to: source('sales', 'SalesTerritory')
+                  field: TerritoryID
+          - name: BillToAddressID
+            description: "FK to Address. Customer billing address."
+          - name: ShipToAddressID
+            description: "FK to Address. Customer shipping address."
+          - name: ShipMethodID
+            description: "FK to ShipMethod. Shipping method."
+            tests:
+              - relationships:
+                  to: source('sales', 'ShipMethod')
+                  field: ShipMethodID
+          - name: CreditCardID
+            description: "FK to CreditCard. NULL if not paid by credit card."
+          - name: CreditCardApprovalCode
+            description: "Approval code provided by the credit card company."
+          - name: CurrencyRateID
+            description: "FK to CurrencyRate. NULL if USD (no conversion required)."
+          - name: SubTotal
+            description: "Sales subtotal. Sum of SalesOrderDetail.LineTotal for the order."
+          - name: TaxAmt
+            description: "Tax amount for the order."
+          - name: Freight
+            description: "Shipping cost for the order."
           - name: TotalDue
             description: "Pre-computed SubTotal + TaxAmt + Freight. Present verbatim in the CSV."
-          - name: OrderDate
-          - name: CustomerID
-          - name: SalesPersonID
-          - name: TerritoryID
+          - name: Comment
+            description: "Sales representative comments."
+          - name: rowguid
+            description: "ROWGUIDCOL number uniquely identifying the record."
           - name: ModifiedDate
+            description: "Date and time the record was last updated."
 
       - name: SalesOrderDetail
         description: "Order line items."
         columns:
           - name: SalesOrderID
-            tests: [not_null]
+            description: "FK to SalesOrderHeader.SalesOrderID. Part of composite PK."
+            tests:
+              - not_null
+              - relationships:
+                  to: source('sales', 'SalesOrderHeader')
+                  field: SalesOrderID
           - name: SalesOrderDetailID
+            description: "Primary key. One sequential number per product sold."
             tests: [not_null]
-          - name: ProductID
-          - name: SpecialOfferID
+          - name: CarrierTrackingNumber
+            description: "Shipment tracking number supplied by the shipper."
           - name: OrderQty
+            description: "Quantity ordered per product."
+          - name: ProductID
+            description: "FK to Product.ProductID."
+            tests:
+              - relationships:
+                  to: source('production', 'Product')
+                  field: ProductID
+          - name: SpecialOfferID
+            description: "FK to SpecialOffer.SpecialOfferID."
+            tests:
+              - relationships:
+                  to: source('sales', 'SpecialOffer')
+                  field: SpecialOfferID
           - name: UnitPrice
+            description: "Selling price of a single product."
           - name: UnitPriceDiscount
+            description: "Discount applied to the unit price."
           - name: LineTotal
             description: "Pre-computed UnitPrice * (1-UnitPriceDiscount) * OrderQty. Present verbatim."
+          - name: rowguid
+            description: "ROWGUIDCOL number uniquely identifying the record."
           - name: ModifiedDate
+            description: "Date and time the record was last updated."
         tests:
           - dbt_utils.unique_combination_of_columns:
               combination_of_columns: [SalesOrderID, SalesOrderDetailID]
 
       - name: SalesTerritory
+        description: "Sales territory lookup with regional groupings and performance totals."
         columns:
           - name: TerritoryID
+            description: "Primary key for the sales territory."
             tests: [not_null, unique]
           - name: Name
+            description: "Sales territory description."
           - name: CountryRegionCode
+            description: "ISO standard country or region code."
           - name: Group
+            description: "Geographic area to which the sales territory belongs."
+          - name: SalesYTD
+            description: "Sales in the territory year to date."
+          - name: SalesLastYear
+            description: "Sales in the territory for the prior year."
+          - name: CostYTD
+            description: "Business costs in the territory year to date."
+          - name: CostLastYear
+            description: "Business costs in the territory for the prior year."
+          - name: rowguid
+            description: "ROWGUIDCOL number uniquely identifying the record."
           - name: ModifiedDate
+            description: "Date and time the record was last updated."
 
       - name: SalesTerritoryHistory
         description: "Historical assignment of sales people to territories."
         columns:
           - name: BusinessEntityID
-            tests: [not_null]
+            description: "FK to SalesPerson.BusinessEntityID. Part of composite PK."
+            tests:
+              - not_null
+              - relationships:
+                  to: source('sales', 'SalesPerson')
+                  field: BusinessEntityID
           - name: TerritoryID
-            tests: [not_null]
+            description: "FK to SalesTerritory.TerritoryID. Part of composite PK."
+            tests:
+              - not_null
+              - relationships:
+                  to: source('sales', 'SalesTerritory')
+                  field: TerritoryID
           - name: StartDate
+            description: "Date the sales person started working in the territory. Part of composite PK."
             tests: [not_null]
           - name: EndDate
+            description: "Date the sales person left the territory. NULL if currently assigned."
+          - name: rowguid
+            description: "ROWGUIDCOL number uniquely identifying the record."
+          - name: ModifiedDate
+            description: "Date and time the record was last updated."
 
       - name: SalesPerson
+        description: "Sales person details including quota and commission information."
         columns:
           - name: BusinessEntityID
-            tests: [not_null, unique]
+            description: "Primary key. FK to Employee.BusinessEntityID."
+            tests:
+              - not_null
+              - unique
+              - relationships:
+                  to: source('humanresources', 'Employee')
+                  field: BusinessEntityID
           - name: TerritoryID
+            description: "FK to SalesTerritory. NULL if not assigned to a territory."
+            tests:
+              - relationships:
+                  to: source('sales', 'SalesTerritory')
+                  field: TerritoryID
           - name: SalesQuota
+            description: "Projected yearly sales. NULL if not applicable."
           - name: Bonus
+            description: "Bonus paid to the sales person."
           - name: CommissionPct
+            description: "Commission percentage of sales."
+          - name: SalesYTD
+            description: "Sales year to date."
+          - name: SalesLastYear
+            description: "Sales total for the prior year."
+          - name: rowguid
+            description: "ROWGUIDCOL number uniquely identifying the record."
+          - name: ModifiedDate
+            description: "Date and time the record was last updated."
 
       - name: SpecialOffer
+        description: "Special discount offers applicable to products."
         columns:
           - name: SpecialOfferID
+            description: "Primary key for the special offer."
             tests: [not_null, unique]
           - name: Description
+            description: "Discount description."
           - name: DiscountPct
+            description: "Discount percentage."
           - name: Type
+            description: "Discount type category (e.g. Seasonal Discount, Volume Discount)."
           - name: Category
+            description: "Group the discount applies to (e.g. Reseller, Customer)."
           - name: StartDate
+            description: "Date the discount started."
           - name: EndDate
+            description: "Date the discount ended."
+          - name: MinQty
+            description: "Minimum quantity required to qualify for the discount."
+          - name: MaxQty
+            description: "Maximum quantity eligible for the discount. NULL = no upper limit."
+          - name: rowguid
+            description: "ROWGUIDCOL number uniquely identifying the record."
+          - name: ModifiedDate
+            description: "Date and time the record was last updated."
 
       - name: SpecialOfferProduct
+        description: "Cross-reference of special offers and applicable products."
         columns:
           - name: SpecialOfferID
-            tests: [not_null]
+            description: "FK to SpecialOffer.SpecialOfferID. Part of composite PK."
+            tests:
+              - not_null
+              - relationships:
+                  to: source('sales', 'SpecialOffer')
+                  field: SpecialOfferID
           - name: ProductID
-            tests: [not_null]
+            description: "FK to Product.ProductID. Part of composite PK."
+            tests:
+              - not_null
+              - relationships:
+                  to: source('production', 'Product')
+                  field: ProductID
+          - name: rowguid
+            description: "ROWGUIDCOL number uniquely identifying the record."
+          - name: ModifiedDate
+            description: "Date and time the record was last updated."
+        tests:
+          - dbt_utils.unique_combination_of_columns:
+              combination_of_columns: [SpecialOfferID, ProductID]
 
       - name: ShipMethod
+        description: "Shipping method lookup with associated rates."
         columns:
           - name: ShipMethodID
+            description: "Primary key for the shipping method."
             tests: [not_null, unique]
           - name: Name
+            description: "Shipping company name."
+          - name: ShipBase
+            description: "Minimum shipping charge."
+          - name: ShipRate
+            description: "Shipping charge per pound."
+          - name: rowguid
+            description: "ROWGUIDCOL number uniquely identifying the record."
+          - name: ModifiedDate
+            description: "Date and time the record was last updated."
 
       - name: CreditCard
+        description: "Customer credit card information."
         columns:
           - name: CreditCardID
+            description: "Primary key for the credit card record."
             tests: [not_null, unique]
           - name: CardType
+            description: "Credit card name (e.g. Visa, Mastercard)."
+          - name: CardNumber
+            description: "Credit card number."
           - name: ExpMonth
+            description: "Credit card expiration month."
           - name: ExpYear
+            description: "Credit card expiration year."
+          - name: ModifiedDate
+            description: "Date and time the record was last updated."
 
       - name: Store
         description: "B2B store / dealer that buys through a sales person."
         columns:
           - name: BusinessEntityID
             description: "PK — also FK to Person.BusinessEntity."
-            tests: [not_null, unique]
+            tests:
+              - not_null
+              - unique
+              - relationships:
+                  to: source('person', 'BusinessEntity')
+                  field: BusinessEntityID
           - name: Name
             description: "Store name."
           - name: SalesPersonID
             description: "FK to SalesPerson — the assigned sales rep."
+            tests:
+              - relationships:
+                  to: source('sales', 'SalesPerson')
+                  field: BusinessEntityID
+          - name: Demographics
+            description: "Demographic information about the store such as annual sales and number of employees."
           - name: rowguid
+            description: "ROWGUIDCOL number uniquely identifying the record."
           - name: ModifiedDate
+            description: "Date and time the record was last updated."

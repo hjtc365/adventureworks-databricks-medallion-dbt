@@ -1,7 +1,19 @@
 {{ config(materialized="view") }}
 
--- Returns each sales person's CURRENT territory assignment plus the
--- territory's KPIs. Used as the basis for dim_salesterritory.
+-- Enriches each sales territory with its current assigned sales person
+-- for use as the source of dim_sales_territory.
+--
+-- Join path:
+--   stg_sales_territory -> stg_sales_territory_history (via sales_territory_bk)
+--
+-- Current assignment: one row per territory via ROW_NUMBER().
+--   Filter   — end_at IS NULL (open-ended assignments only)
+--   Priority — start_at DESC (most recent open assignment wins on tie)
+--
+-- Note: LEFT JOIN to current_assignments because not all territories have
+-- an active sales person assigned (e.g. newly created or retired territories).
+-- Such territories are retained with current_sales_person_bk = NULL rather
+-- than being dropped from the dimension.
 with
     t as (select * from {{ ref("stg_sales_territory") }}),
     h as (select * from {{ ref("stg_sales_territory_history") }}),
