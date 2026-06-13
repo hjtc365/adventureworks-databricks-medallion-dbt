@@ -16,6 +16,13 @@ models:
         tests: [not_null, unique]
       - name: customer_bk
         tests: [not_null, unique]
+      - name: account_number
+        description: "Customer account number ('AW' + zero-padded ID). Null only for the Unknown member."
+        tests:
+          - not_null:
+              where: "is_unknown = false"
+          - unique:
+              where: "is_unknown = false"
       - name: customer_type
         tests:
           - accepted_values:
@@ -46,6 +53,23 @@ models:
         tests: [not_null]
       - name: valid_from
         tests: [not_null]
+      - name: product_name
+        tests:
+          - not_null:
+              where: "is_unknown = false"
+      - name: product_number
+        tests:
+          - not_null:
+              where: "is_unknown = false"
+          - unique:
+              where: "is_unknown = false"
+      - name: is_current
+        tests: [not_null]
+      - name: product_status
+        tests:
+          - accepted_values:
+              values: ["Active", "Inactive", "Discontinued"]
+              where: "is_unknown = false"
       - name: list_price
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
@@ -74,6 +98,22 @@ models:
         tests: [not_null, unique]
       - name: employee_bk
         tests: [not_null]
+      - name: valid_from
+        tests: [not_null]
+      - name: is_current_version
+        tests: [not_null]
+      - name: login_id
+        tests:
+          - not_null:
+              where: "is_unknown = false"
+      - name: job_title
+        tests:
+          - not_null:
+              where: "is_unknown = false"
+      - name: hire_date
+        tests:
+          - not_null:
+              where: "is_unknown = false"
       - name: is_unknown
         tests: [not_null]
 
@@ -91,6 +131,20 @@ models:
         tests: [not_null, unique]
       - name: sales_territory_bk
         tests: [not_null]
+      - name: valid_from
+        tests: [not_null]
+      - name: is_current
+        tests: [not_null]
+      - name: territory_name
+        tests: [not_null]
+      - name: country_region_code
+        tests:
+          - not_null:
+              where: "is_unknown = false"
+      - name: territory_group
+        tests:
+          - not_null:
+              where: "is_unknown = false"
       - name: is_unknown
         tests: [not_null]
 
@@ -126,6 +180,28 @@ models:
               min_value: 1
               max_value: 31
               row_condition: "is_unknown = false"
+      - name: quarter_number
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+              max_value: 4
+              row_condition: "is_unknown = false"
+      - name: day_of_week
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+              max_value: 7
+              row_condition: "is_unknown = false"
+      - name: is_weekend
+        tests:
+          - not_null:
+              where: "is_unknown = false"
+      - name: fiscal_quarter
+        tests:
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+              max_value: 4
+              row_condition: "is_unknown = false"
       - name: is_unknown
         tests: [not_null]
 
@@ -138,6 +214,25 @@ models:
       - name: special_offer_sk
         tests: [not_null, unique]
       - name: special_offer_bk
+        tests: [not_null]
+      - name: offer_description
+        tests:
+          - not_null:
+              where: "is_unknown = false"
+      - name: offer_type
+        tests:
+          - not_null:
+              where: "is_unknown = false"
+      - name: offer_category
+        tests:
+          - not_null:
+              where: "is_unknown = false"
+      - name: eligible_product_count
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: is_active
         tests: [not_null]
       - name: discount_pct
         tests:
@@ -159,5 +254,25 @@ models:
     columns:
       - name: sales_order_junk_sk
         tests: [not_null, unique]
+      - name: order_status
+        tests:
+          - not_null
+          - accepted_values:
+              values: ["In process", "Approved", "Backordered", "Rejected", "Shipped", "Cancelled", "Unknown"]
+      - name: revision_number
+        tests:
+          - not_null:
+              where: "is_unknown = false"
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+              row_condition: "is_unknown = false"
       - name: is_unknown
         tests: [not_null]
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - order_status
+            - is_online_order
+            - revision_number
+            - ship_method_name
+            - card_type

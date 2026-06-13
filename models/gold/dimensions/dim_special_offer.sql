@@ -69,6 +69,8 @@ with
             true as is_unknown
     )
 
-select * from enriched
+select *
+from enriched
 union all
-select * from unknown_member
+select *
+from unknown_member

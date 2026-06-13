@@ -5,4 +5,5 @@ logs/
 .venv/
 .vscode/
 .github/
+**/todo/
 resources/
