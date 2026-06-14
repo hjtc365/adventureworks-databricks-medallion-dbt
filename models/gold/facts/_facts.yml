@@ -22,14 +22,14 @@ models:
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_match_regex:
-              regex: '^\d+-\d+$'
+              regex: '^\\d+-\\d+$'
       - name: order_date
         tests:
           - not_null
-          - dbt_expectations.expect_column_values_to_be_between:
-              min_value: "'1990-01-01'"
-              max_value: "'2030-12-31'"
-              row_condition: "order_date is not null"
+          - dbt_utils.expression_is_true:
+              expression: ">= '1990-01-01' and order_date <= '2030-12-31'"
+              config:
+                where: "order_date is not null"
       - name: order_date_sk
         tests:
           - not_null

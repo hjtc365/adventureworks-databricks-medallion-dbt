@@ -183,7 +183,7 @@ models:
           - not_null
           - unique
           - dbt_expectations.expect_column_values_to_match_regex:
-              regex: '^AW\d{8}$'
+              regex: '^AW[0-9]{8}$'
       - name: customer_type
         description: "Derived customer type."
         tests:
@@ -212,7 +212,7 @@ models:
           - not_null
           - unique
           - dbt_expectations.expect_column_values_to_match_regex:
-              regex: '^SO\d+$'
+              regex: '^SO[0-9]+$'
       - name: order_date
         description: "Date the order was placed."
         tests: [not_null]
@@ -262,22 +262,16 @@ models:
               min_value: 0
       - name: ship_date
         description: "Date the order was shipped. Null if not yet shipped."
-        tests:
-          - dbt_expectations.expect_column_pair_values_a_to_be_greater_than_b:
-              column_A: ship_date
-              column_B: order_date
-              or_equal: true
-              row_condition: "ship_date is not null"
       - name: due_date
         description: "Date the order is due. Must be on or after order_date."
-        tests:
-          - dbt_expectations.expect_column_pair_values_a_to_be_greater_than_b:
-              column_A: due_date
-              column_B: order_date
-              or_equal: true
       - name: modified_at
         description: "Timestamp of the last modification."
         tests: [not_null]
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "ship_date IS NULL OR ship_date >= order_date"
+      - dbt_utils.expression_is_true:
+          expression: "due_date >= order_date"
 
   - name: stg_sales_order_detail
     description: "Order line items — incremental MERGE on composite line key."
@@ -503,7 +497,7 @@ models:
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_match_regex:
-              regex: '^X+\d{4}$'
+              regex: '^X+[0-9]{4}$'
       - name: exp_month
         description: "Expiry month (1-12)."
         tests:
@@ -548,8 +542,6 @@ models:
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
               min_value: 0
-          - dbt_utils.expression_is_true:
-              expression: "standard_cost <= list_price or list_price = 0"
       - name: product_subcategory_bk
         description: "FK to stg_product_subcategory. Null for uncategorised products."
         tests:
@@ -559,6 +551,30 @@ models:
       - name: modified_at
         description: "Timestamp of the last modification."
         tests: [not_null]
+      - name: product_line
+        description: "Product line designation. R = Road, M = Mountain, T = Touring, S = Standard."
+        tests:
+          - accepted_values:
+              values: ['R', 'M', 'T', 'S']
+              config:
+                where: "product_line is not null"
+      - name: product_class
+        description: "Product class. H = High, M = Medium, L = Low."
+        tests:
+          - accepted_values:
+              values: ['H', 'M', 'L']
+              config:
+                where: "product_class is not null"
+      - name: product_style
+        description: "Product style. W = Womens, M = Mens, U = Universal."
+        tests:
+          - accepted_values:
+              values: ['W', 'M', 'U']
+              config:
+                where: "product_style is not null"
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "CAST(standard_cost AS DECIMAL(18,2)) <= CAST(list_price AS DECIMAL(18,2)) OR list_price = 0"
 
   - name: stg_product_subcategory
     description: "Product subcategory reference — deduplicated."

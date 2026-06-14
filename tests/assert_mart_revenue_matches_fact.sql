@@ -11,13 +11,13 @@ with fact_total as (
 ),
 
 mart_total as (
-    select sum(gross_revenue) as total
+    select sum(net_revenue) as total
     from {{ ref('mart_sales_summary') }}
 )
 
 select
-    fact_total.total  as fact_gross_revenue,
-    mart_total.total  as mart_gross_revenue,
+    fact_total.total  as fact_net_revenue,
+    mart_total.total  as mart_net_revenue,
     abs(fact_total.total - mart_total.total) as delta
 from fact_total
 cross join mart_total

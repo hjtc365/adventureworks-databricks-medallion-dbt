@@ -121,12 +121,6 @@ models:
         tests: [not_null]
       - name: sell_end_at
         description: "Date the product was removed from sale. Null = still for sale."
-        tests:
-          - dbt_expectations.expect_column_pair_values_a_to_be_greater_than_b:
-              column_A: sell_end_at
-              column_B: sell_start_at
-              or_equal: true
-              row_condition: "sell_end_at is not null"
       - name: discontinued_at
         description: "Date the product was discontinued. Null = not discontinued. When set, product_status = 'Discontinued'."
       - name: product_status
@@ -143,6 +137,8 @@ models:
     tests:
       - dbt_utils.expression_is_true:
           expression: "discontinued_at is null or product_status = 'Discontinued'"
+      - dbt_utils.expression_is_true:
+          expression: "sell_end_at IS NULL OR sell_end_at >= sell_start_at"
           name: product_status_discontinued_when_discontinued_at_set
       - dbt_utils.expression_is_true:
           expression: "standard_cost <= list_price or list_price = 0"
@@ -232,12 +228,8 @@ models:
         description: "Timestamp of the last modification on the employee record."
         tests: [not_null]
     tests:
-      - dbt_expectations.expect_column_pair_values_a_to_be_greater_than_b:
-          column_A: hire_date
-          column_B: birth_date
-          or_equal: false
-          row_condition: "birth_date is not null"
-          name: hire_date_after_birth_date
+      - dbt_utils.expression_is_true:
+          expression: "birth_date IS NULL OR hire_date > birth_date"
 
   # ────────────────────────────────────────────────────────
   # Sales domain
@@ -409,20 +401,8 @@ models:
         tests: [not_null]
       - name: due_date
         description: "Date the order is due to the customer. Must be on or after order_date."
-        tests:
-          - dbt_expectations.expect_column_pair_values_a_to_be_greater_than_b:
-              column_A: due_date
-              column_B: order_date
-              or_equal: true
-              row_condition: "due_date is not null"
       - name: ship_date
         description: "Actual ship date. Null if the order has not yet shipped. Must be on or after order_date when set."
-        tests:
-          - dbt_expectations.expect_column_pair_values_a_to_be_greater_than_b:
-              column_A: ship_date
-              column_B: order_date
-              or_equal: true
-              row_condition: "ship_date is not null"
       - name: order_status
         description: "Human-readable order status label carried from the header."
         tests: [not_null]
@@ -505,3 +485,8 @@ models:
       - name: modified_at
         description: "Timestamp of the last modification on the detail row."
         tests: [not_null]
+    tests:
+      - dbt_utils.expression_is_true:
+          expression: "due_date IS NULL OR due_date >= order_date"
+      - dbt_utils.expression_is_true:
+          expression: "ship_date IS NULL OR ship_date >= order_date"

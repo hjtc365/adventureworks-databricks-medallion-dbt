@@ -2,45 +2,132 @@ version: 2
 
 models:
   - name: mart_sales_summary
-    description: "Sales aggregated by territory + product category + month. BI-ready."
+    description: >
+      Pre-aggregated sales summary by territory + product category + month.
+      Powers BI dashboards directly without re-computing aggregations.
+      Grain: one row per (year_number, quarter_number, month_number, territory_name, category_name, subcategory_name).
     columns:
+      # ── Date ──────────────────────────────────────────────────────────────
+      - name: year_number
+        description: "Calendar year of the order date."
+        tests: [not_null]
+      - name: quarter_number
+        description: "Calendar quarter (1–4) of the order date."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+              max_value: 4
+      - name: month_number
+        description: "Calendar month (1–12) of the order date."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+              max_value: 12
+      - name: month_name
+        description: "Full month name (e.g. January)."
+        tests: [not_null]
+      # ── Territory ─────────────────────────────────────────────────────────
+      - name: territory_name
+        description: "Sales territory name."
+        tests: [not_null]
+      - name: country_region_code
+        description: "ISO country/region code for the territory."
+        tests: [not_null]
+      - name: territory_group
+        description: "Regional group (e.g. North America, Europe)."
+        tests: [not_null]
+      # ── Product ───────────────────────────────────────────────────────────
+      - name: category_name
+        description: "Top-level product category name."
+        tests: [not_null]
+      - name: subcategory_name
+        description: "Product subcategory name."
+        tests: [not_null]
+      # ── Order counts ──────────────────────────────────────────────────────
+      - name: order_count
+        description: "Distinct sales orders in this slice."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+      - name: line_count
+        description: "Total order line items in this slice."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+      # ── Volume ────────────────────────────────────────────────────────────
+      - name: units_sold
+        description: "Total quantity of units sold (sum of order_qty)."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 1
+      - name: avg_units_per_order
+        description: "Average units per distinct order (units_sold / order_count)."
+      - name: avg_lines_per_order
+        description: "Average line items per distinct order (line_count / order_count)."
+      # ── Revenue waterfall ─────────────────────────────────────────────────
       - name: gross_revenue
+        description: "Committed unit price × qty before any discount (sum of unit_price * order_qty)."
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              min_value: 0
+      - name: discount_amount
+        description: "Total discount applied (gross_revenue − net_revenue). Always >= 0."
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
               min_value: 0
       - name: net_revenue
+        description: "Actual recognised revenue after discounts (sum of line_total = gross_revenue − discount_amount)."
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
               min_value: 0
-      - name: order_count
+      # ── Overhead ──────────────────────────────────────────────────────────
+      - name: freight_allocated
+        description: "Freight pro-rated to lines in this slice."
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 1
-      - name: units_sold
+              min_value: 0
+      - name: tax_allocated
+        description: "Tax pro-rated to lines in this slice."
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 1
-      - name: month_number
+              min_value: 0
+      # ── Profitability ─────────────────────────────────────────────────────
+      - name: total_cost
+        description: "COGS at standard cost for units sold (standard_cost × order_qty)."
         tests:
+          - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 1
-              max_value: 12
-      - name: quarter_number
-        tests:
-          - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 1
-              max_value: 4
+              min_value: 0
+      - name: gross_profit
+        description: "Net revenue minus COGS only, before freight and tax (net_revenue − total_cost)."
+        tests: [not_null]
+      # ── Averages ──────────────────────────────────────────────────────────
+      - name: avg_order_value
+        description: "Net revenue per distinct order (net_revenue / order_count)."
+      - name: avg_line_value
+        description: "Mean net revenue per individual order line."
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns:
             - year_number
+            - quarter_number
             - month_number
             - territory_name
             - category_name
             - subcategory_name
       - dbt_utils.expression_is_true:
-          expression: "net_revenue >= gross_revenue"
+          expression: "net_revenue <= gross_revenue"
+      - dbt_utils.expression_is_true:
+          expression: "discount_amount >= 0 AND discount_amount = gross_revenue - net_revenue"
+      - dbt_utils.expression_is_true:
+          expression: "gross_profit = net_revenue - total_cost"

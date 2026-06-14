@@ -11,7 +11,8 @@ sources:
     database: "{{ 'adventureworks_prod' if target.name == 'prod' else 'adventureworks_dev' }}"
     schema: bronze
     loader: databricks_bronze_bootstrap_notebook
-    loaded_at_field: ModifiedDate
+    config:
+      loaded_at_field: ModifiedDate
 
     freshness:
       warn_after: { count: 24, period: hour }

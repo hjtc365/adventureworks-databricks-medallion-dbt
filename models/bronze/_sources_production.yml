@@ -5,7 +5,8 @@ sources:
     description: "AdventureWorks Production domain — products, categories, inventory, pricing."
     database: "{{ 'adventureworks_prod' if target.name == 'prod' else 'adventureworks_dev' }}"
     schema: bronze
-    loaded_at_field: ModifiedDate
+    config:
+      loaded_at_field: ModifiedDate
 
     tables:
       - name: Product
@@ -51,19 +52,13 @@ sources:
             description: "Number of days required to manufacture the product."
           - name: ProductLine
             description: "Product line designation. R = Road, M = Mountain, T = Touring, S = Standard."
-            tests:
-              - accepted_values:
-                  values: ['R', 'M', 'T', 'S']
+            # no accepted_values test here — raw source has trailing spaces, tested downstream
           - name: Class
             description: "Product class. H = High, M = Medium, L = Low."
-            tests:
-              - accepted_values:
-                  values: ['H', 'M', 'L']
+            # no accepted_values test here — raw source has trailing spaces, tested downstream
           - name: Style
             description: "Product style. W = Womens, M = Mens, U = Universal."
-            tests:
-              - accepted_values:
-                  values: ['W', 'M', 'U']
+            # no accepted_values test here — raw source has trailing spaces, tested downstream
           - name: ProductSubcategoryID
             description: "Foreign key to ProductSubcategory. NULL if not categorised."
             tests:

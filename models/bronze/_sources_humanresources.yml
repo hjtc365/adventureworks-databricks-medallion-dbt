@@ -10,7 +10,8 @@ sources:
     description: "AdventureWorks HR domain — employees, departments, pay history."
     database: "{{ 'adventureworks_prod' if target.name == 'prod' else 'adventureworks_dev' }}"
     schema: bronze
-    loaded_at_field: ModifiedDate
+    config:
+      loaded_at_field: ModifiedDate
 
     tables:
       - name: Employee
