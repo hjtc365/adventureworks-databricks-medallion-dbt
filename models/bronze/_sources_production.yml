@@ -6,7 +6,7 @@ sources:
     database: "{{ 'adventureworks_prod' if target.name == 'prod' else 'adventureworks_dev' }}"
     schema: bronze
     config:
-      loaded_at_field: "cast(ModifiedDate as timestamp)"
+      loaded_at_field: "cast(LoadedAt as timestamp)"
 
     tables:
       - name: Product
