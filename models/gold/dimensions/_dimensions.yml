@@ -20,20 +20,24 @@ models:
         description: "Customer account number ('AW' + zero-padded ID). Null only for the Unknown member."
         tests:
           - not_null:
-              where: "is_unknown = false"
+              config:
+                where: "is_unknown = false"
           - unique:
-              where: "is_unknown = false"
+              config:
+                where: "is_unknown = false"
       - name: customer_type
         tests:
           - accepted_values:
-              values: ['Individual', 'Store', 'StoreContact', 'Unknown']
+              arguments:
+                values: ['Individual', 'Store', 'StoreContact', 'Unknown']
       - name: customer_name
         tests: [not_null]
       - name: is_unknown
         tests: [not_null]
     tests:
       - dbt_utils.expression_is_true:
-          expression: "customer_bk is not null or is_unknown = true"
+          arguments:
+            expression: "customer_bk is not null or is_unknown = true"
 
   - name: dim_product
     description: |
@@ -43,9 +47,10 @@ models:
       the point-in-time predicate always finds it.
     tests:
       - test_scd2_no_date_overlap:
-          business_key: product_bk
-          valid_from: valid_from
-          valid_to: valid_to
+          arguments:
+            business_key: product_bk
+            valid_from: valid_from
+            valid_to: valid_to
     columns:
       - name: product_sk
         tests: [not_null, unique]
@@ -56,30 +61,37 @@ models:
       - name: product_name
         tests:
           - not_null:
-              where: "is_unknown = false"
+              config:
+                where: "is_unknown = false"
       - name: product_number
         tests:
           - not_null:
-              where: "is_unknown = false"
+              config:
+                where: "is_unknown = false"
           - unique:
-              where: "is_unknown = false"
+              config:
+                where: "is_unknown = false"
       - name: is_current
         tests: [not_null]
       - name: product_status
         tests:
           - accepted_values:
-              values: ["Active", "Inactive", "Discontinued"]
-              where: "is_unknown = false"
+              arguments:
+                values: ["Active", "Inactive", "Discontinued"]
+              config:
+                where: "is_unknown = false"
       - name: list_price
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
-              row_condition: "is_unknown = false"
+              arguments:
+                min_value: 0
+                row_condition: "is_unknown = false"
       - name: standard_cost
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
-              row_condition: "is_unknown = false"
+              arguments:
+                min_value: 0
+                row_condition: "is_unknown = false"
       - name: is_unknown
         tests: [not_null]
 
@@ -90,9 +102,10 @@ models:
       no rep is assigned.
     tests:
       - test_scd2_no_date_overlap:
-          business_key: employee_bk
-          valid_from: valid_from
-          valid_to: valid_to
+          arguments:
+            business_key: employee_bk
+            valid_from: valid_from
+            valid_to: valid_to
     columns:
       - name: employee_sk
         tests: [not_null, unique]
@@ -105,15 +118,18 @@ models:
       - name: login_id
         tests:
           - not_null:
-              where: "is_unknown = false"
+              config:
+                where: "is_unknown = false"
       - name: job_title
         tests:
           - not_null:
-              where: "is_unknown = false"
+              config:
+                where: "is_unknown = false"
       - name: hire_date
         tests:
           - not_null:
-              where: "is_unknown = false"
+              config:
+                where: "is_unknown = false"
       - name: is_unknown
         tests: [not_null]
 
@@ -123,9 +139,10 @@ models:
       (sales_territory_sk = '-1', is_unknown = true).
     tests:
       - test_scd2_no_date_overlap:
-          business_key: sales_territory_bk
-          valid_from: valid_from
-          valid_to: valid_to
+          arguments:
+            business_key: sales_territory_bk
+            valid_from: valid_from
+            valid_to: valid_to
     columns:
       - name: sales_territory_sk
         tests: [not_null, unique]
@@ -140,11 +157,13 @@ models:
       - name: country_region_code
         tests:
           - not_null:
-              where: "is_unknown = false"
+              config:
+                where: "is_unknown = false"
       - name: territory_group
         tests:
           - not_null:
-              where: "is_unknown = false"
+              config:
+                where: "is_unknown = false"
       - name: is_unknown
         tests: [not_null]
 
@@ -161,47 +180,55 @@ models:
           - unique
           # full_date is NULL only on the Unknown member (date_sk = -1).
           - not_null:
-              where: "date_sk <> -1"
+              config:
+                where: "date_sk <> -1"
       - name: year_number
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 1990
-              max_value: 2030
-              row_condition: "is_unknown = false"
+              arguments:
+                min_value: 1990
+                max_value: 2030
+                row_condition: "is_unknown = false"
       - name: month_number
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 1
-              max_value: 12
-              row_condition: "is_unknown = false"
+              arguments:
+                min_value: 1
+                max_value: 12
+                row_condition: "is_unknown = false"
       - name: day_of_month
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 1
-              max_value: 31
-              row_condition: "is_unknown = false"
+              arguments:
+                min_value: 1
+                max_value: 31
+                row_condition: "is_unknown = false"
       - name: quarter_number
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 1
-              max_value: 4
-              row_condition: "is_unknown = false"
+              arguments:
+                min_value: 1
+                max_value: 4
+                row_condition: "is_unknown = false"
       - name: day_of_week
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 1
-              max_value: 7
-              row_condition: "is_unknown = false"
+              arguments:
+                min_value: 1
+                max_value: 7
+                row_condition: "is_unknown = false"
       - name: is_weekend
         tests:
           - not_null:
-              where: "is_unknown = false"
+              config:
+                where: "is_unknown = false"
       - name: fiscal_quarter
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 1
-              max_value: 4
-              row_condition: "is_unknown = false"
+              arguments:
+                min_value: 1
+                max_value: 4
+                row_condition: "is_unknown = false"
       - name: is_unknown
         tests: [not_null]
 
@@ -218,31 +245,37 @@ models:
       - name: offer_description
         tests:
           - not_null:
-              where: "is_unknown = false"
+              config:
+                where: "is_unknown = false"
       - name: offer_type
         tests:
           - not_null:
-              where: "is_unknown = false"
+              config:
+                where: "is_unknown = false"
       - name: offer_category
         tests:
           - not_null:
-              where: "is_unknown = false"
+              config:
+                where: "is_unknown = false"
       - name: eligible_product_count
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: is_active
         tests: [not_null]
       - name: discount_pct
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
-              max_value: 1
+              arguments:
+                min_value: 0
+                max_value: 1
       - name: discount_tier
         tests:
           - accepted_values:
-              values: ['No Discount', 'Low (<5%)', 'Medium (5-15%)', 'High (15-30%)', 'Deep (30%+)']
+              arguments:
+                values: ['No Discount', 'Low (<5%)', 'Medium (5-15%)', 'High (15-30%)', 'Deep (30%+)']
       - name: is_unknown
         tests: [not_null]
 
@@ -258,21 +291,25 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ["In process", "Approved", "Backordered", "Rejected", "Shipped", "Cancelled", "Unknown"]
+              arguments:
+                values: ["In process", "Approved", "Backordered", "Rejected", "Shipped", "Cancelled", "Unknown"]
       - name: revision_number
         tests:
           - not_null:
-              where: "is_unknown = false"
+              config:
+                where: "is_unknown = false"
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
-              row_condition: "is_unknown = false"
+              arguments:
+                min_value: 0
+                row_condition: "is_unknown = false"
       - name: is_unknown
         tests: [not_null]
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - order_status
-            - is_online_order
-            - revision_number
-            - ship_method_name
-            - card_type
+          arguments:
+            combination_of_columns:
+              - order_status
+              - is_online_order
+              - revision_number
+              - ship_method_name
+              - card_type

@@ -26,14 +26,13 @@ sources:
     schema: bronze
     config:
       loaded_at_field: "cast(LoadedAt as timestamp)"
-    tags:
-      - person_domain
-      - bronze
-      - adventureworks
-
-    freshness:
-      warn_after: { count: 24, period: hour }
-      error_after: { count: 48, period: hour }
+      tags:
+        - person_domain
+        - bronze
+        - adventureworks
+      freshness:
+        warn_after: { count: 24, period: hour }
+        error_after: { count: 48, period: hour }
 
     tables:
 
@@ -51,7 +50,8 @@ sources:
           created, giving every entity a globally unique BusinessEntityID.
           Shared contact tables (Address, Phone, Email, Contact) all reference
           this ID, so they serve all entity types without duplication.
-        tags: [supertype, identity]
+        config:
+          tags: [supertype, identity]
         columns:
           - name: BusinessEntityID
             description: >
@@ -83,7 +83,8 @@ sources:
           customers, or vendor contacts. BusinessEntityID is both the PK of
           this table and a FK to BusinessEntity, enforcing a strict one-to-one
           relationship. Load with PIPE delimiter ('+|').
-        tags: [subtype, pii, pipe_delimited]
+        config:
+          tags: [subtype, pii, pipe_delimited]
         columns:
           - name: BusinessEntityID
             description: >
@@ -93,8 +94,9 @@ sources:
               - not_null
               - unique
               - relationships:
-                  to: source('person', 'BusinessEntity')
-                  field: BusinessEntityID
+                  arguments:
+                    to: source('person', 'BusinessEntity')
+                    field: BusinessEntityID
 
           - name: PersonType
             description: >
@@ -109,7 +111,8 @@ sources:
             tests:
               - not_null
               - accepted_values:
-                  values: ['SC', 'IN', 'SP', 'EM', 'VC', 'GC']
+                  arguments:
+                    values: ['SC', 'IN', 'SP', 'EM', 'VC', 'GC']
 
           - name: NameStyle
             description: >
@@ -119,7 +122,8 @@ sources:
               Cast to BOOLEAN in silver.
             tests:
               - accepted_values:
-                  values: [0, 1]
+                  arguments:
+                    values: [0, 1]
 
           - name: Title
             description: "Courtesy title — e.g. Mr., Ms., Dr., Sr. Nullable."
@@ -149,7 +153,8 @@ sources:
             tests:
               - not_null
               - accepted_values:
-                  values: [0, 1, 2]
+                  arguments:
+                    values: [0, 1, 2]
 
           - name: AdditionalContactInfo
             description: >
@@ -185,7 +190,8 @@ sources:
           an address to a Person, Store, or Vendor with a typed relationship
           (e.g. Billing, Shipping, Home). One Address row can be reused across
           multiple entities. Load with TAB delimiter.
-        tags: [shared, pii, tab_delimited]
+        config:
+          tags: [shared, pii, tab_delimited]
         columns:
           - name: AddressID
             description: "Surrogate PK. Auto-incremented."
@@ -211,8 +217,9 @@ sources:
             tests:
               - not_null
               - relationships:
-                  to: source('person', 'StateProvince')
-                  field: StateProvinceID
+                  arguments:
+                    to: source('person', 'StateProvince')
+                    field: StateProvinceID
 
           - name: PostalCode
             description: >
@@ -246,10 +253,11 @@ sources:
           normalize geographic data on Address rows. Also carries the
           TerritoryID linking to the Sales domain's SalesTerritory table.
           Load with TAB delimiter.
-        tags: [reference, tab_delimited]
-        freshness:
-          warn_after: { count: 7, period: day }
-          error_after: { count: 30, period: day }
+        config:
+          tags: [reference, tab_delimited]
+          freshness:
+            warn_after: { count: 7, period: day }
+            error_after: { count: 30, period: day }
         columns:
           - name: StateProvinceID
             description: "Surrogate PK."
@@ -280,7 +288,8 @@ sources:
             tests:
               - not_null
               - accepted_values:
-                  values: [0, 1]
+                  arguments:
+                    values: [0, 1]
 
           - name: Name
             description: "Full English name of the state or province."
@@ -295,8 +304,9 @@ sources:
             tests:
               - not_null
               - relationships:
-                  to: source('sales', 'SalesTerritory')
-                  field: TerritoryID
+                  arguments:
+                    to: source('sales', 'SalesTerritory')
+                    field: TerritoryID
 
           - name: rowguid
             description: "GUID for replication. Load as STRING."
@@ -319,7 +329,8 @@ sources:
           relationship — e.g. Billing, Shipping, Home, Main Office. A single
           entity can have multiple address rows of different types. Load with
           PIPE delimiter ('+|').
-        tags: [junction, pipe_delimited]
+        config:
+          tags: [junction, pipe_delimited]
         columns:
           - name: BusinessEntityID
             description: >
@@ -328,16 +339,18 @@ sources:
             tests:
               - not_null
               - relationships:
-                  to: source('person', 'BusinessEntity')
-                  field: BusinessEntityID
+                  arguments:
+                    to: source('person', 'BusinessEntity')
+                    field: BusinessEntityID
 
           - name: AddressID
             description: "FK to Address.AddressID."
             tests:
               - not_null
               - relationships:
-                  to: source('person', 'Address')
-                  field: AddressID
+                  arguments:
+                    to: source('person', 'Address')
+                    field: AddressID
 
           - name: AddressTypeID
             description: >
@@ -348,7 +361,8 @@ sources:
             tests:
               - not_null
               - accepted_values:
-                  values: [1, 2, 3, 4, 5, 6]
+                  arguments:
+                    values: [1, 2, 3, 4, 5, 6]
 
           - name: rowguid
             description: "GUID for replication. Load as STRING."

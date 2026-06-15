@@ -13,10 +13,9 @@ sources:
     loader: databricks_bronze_bootstrap_notebook
     config:
       loaded_at_field: "cast(LoadedAt as timestamp)"
-
-    freshness:
-      warn_after: { count: 24, period: hour }
-      error_after: { count: 48, period: hour }
+      freshness:
+        warn_after: { count: 24, period: hour }
+        error_after: { count: 48, period: hour }
 
     tables:
       - name: Customer
@@ -29,20 +28,23 @@ sources:
             description: "FK to Person — null for store-only customers."
             tests:
               - relationships:
-                  to: source('person', 'Person')
-                  field: BusinessEntityID
+                  arguments:
+                    to: source('person', 'Person')
+                    field: BusinessEntityID
           - name: StoreID
             description: "FK to Store — null for individual customers."
             tests:
               - relationships:
-                  to: source('sales', 'Store')
-                  field: BusinessEntityID
+                  arguments:
+                    to: source('sales', 'Store')
+                    field: BusinessEntityID
           - name: TerritoryID
             description: "FK to SalesTerritory."
             tests:
               - relationships:
-                  to: source('sales', 'SalesTerritory')
-                  field: TerritoryID
+                  arguments:
+                    to: source('sales', 'SalesTerritory')
+                    field: TerritoryID
           - name: AccountNumber
             description: "Pre-computed string 'AW' + 8-digit padded CustomerID. Present verbatim in the CSV."
           - name: rowguid
@@ -68,12 +70,14 @@ sources:
             description: "Order status. 1=In process, 2=Approved, 3=Backordered, 4=Rejected, 5=Shipped, 6=Cancelled."
             tests:
               - accepted_values:
-                  values: [1, 2, 3, 4, 5, 6]
+                  arguments:
+                    values: [1, 2, 3, 4, 5, 6]
           - name: OnlineOrderFlag
             description: "0 = Order placed by sales person, 1 = Order placed online by customer."
             tests:
               - accepted_values:
-                  values: [0, 1]
+                  arguments:
+                    values: [0, 1]
           - name: SalesOrderNumber
             description: "Pre-computed 'SO' + SalesOrderID. Present verbatim in the CSV."
           - name: PurchaseOrderNumber
@@ -84,20 +88,23 @@ sources:
             description: "FK to Customer.CustomerID."
             tests:
               - relationships:
-                  to: source('sales', 'Customer')
-                  field: CustomerID
+                  arguments:
+                    to: source('sales', 'Customer')
+                    field: CustomerID
           - name: SalesPersonID
             description: "FK to SalesPerson. NULL for online orders."
             tests:
               - relationships:
-                  to: source('sales', 'SalesPerson')
-                  field: BusinessEntityID
+                  arguments:
+                    to: source('sales', 'SalesPerson')
+                    field: BusinessEntityID
           - name: TerritoryID
             description: "FK to SalesTerritory."
             tests:
               - relationships:
-                  to: source('sales', 'SalesTerritory')
-                  field: TerritoryID
+                  arguments:
+                    to: source('sales', 'SalesTerritory')
+                    field: TerritoryID
           - name: BillToAddressID
             description: "FK to Address. Customer billing address."
           - name: ShipToAddressID
@@ -106,8 +113,9 @@ sources:
             description: "FK to ShipMethod. Shipping method."
             tests:
               - relationships:
-                  to: source('sales', 'ShipMethod')
-                  field: ShipMethodID
+                  arguments:
+                    to: source('sales', 'ShipMethod')
+                    field: ShipMethodID
           - name: CreditCardID
             description: "FK to CreditCard. NULL if not paid by credit card."
           - name: CreditCardApprovalCode
@@ -137,8 +145,9 @@ sources:
             tests:
               - not_null
               - relationships:
-                  to: source('sales', 'SalesOrderHeader')
-                  field: SalesOrderID
+                  arguments:
+                    to: source('sales', 'SalesOrderHeader')
+                    field: SalesOrderID
           - name: SalesOrderDetailID
             description: "Primary key. One sequential number per product sold."
             tests: [not_null]
@@ -150,14 +159,16 @@ sources:
             description: "FK to Product.ProductID."
             tests:
               - relationships:
-                  to: source('production', 'Product')
-                  field: ProductID
+                  arguments:
+                    to: source('production', 'Product')
+                    field: ProductID
           - name: SpecialOfferID
             description: "FK to SpecialOffer.SpecialOfferID."
             tests:
               - relationships:
-                  to: source('sales', 'SpecialOffer')
-                  field: SpecialOfferID
+                  arguments:
+                    to: source('sales', 'SpecialOffer')
+                    field: SpecialOfferID
           - name: UnitPrice
             description: "Selling price of a single product."
           - name: UnitPriceDiscount
@@ -170,7 +181,8 @@ sources:
             description: "Date and time the record was last updated."
         tests:
           - dbt_utils.unique_combination_of_columns:
-              combination_of_columns: [SalesOrderID, SalesOrderDetailID]
+              arguments:
+                combination_of_columns: [SalesOrderID, SalesOrderDetailID]
 
       - name: SalesTerritory
         description: "Sales territory lookup with regional groupings and performance totals."
@@ -205,15 +217,17 @@ sources:
             tests:
               - not_null
               - relationships:
-                  to: source('sales', 'SalesPerson')
-                  field: BusinessEntityID
+                  arguments:
+                    to: source('sales', 'SalesPerson')
+                    field: BusinessEntityID
           - name: TerritoryID
             description: "FK to SalesTerritory.TerritoryID. Part of composite PK."
             tests:
               - not_null
               - relationships:
-                  to: source('sales', 'SalesTerritory')
-                  field: TerritoryID
+                  arguments:
+                    to: source('sales', 'SalesTerritory')
+                    field: TerritoryID
           - name: StartDate
             description: "Date the sales person started working in the territory. Part of composite PK."
             tests: [not_null]
@@ -233,14 +247,16 @@ sources:
               - not_null
               - unique
               - relationships:
-                  to: source('humanresources', 'Employee')
-                  field: BusinessEntityID
+                  arguments:
+                    to: source('humanresources', 'Employee')
+                    field: BusinessEntityID
           - name: TerritoryID
             description: "FK to SalesTerritory. NULL if not assigned to a territory."
             tests:
               - relationships:
-                  to: source('sales', 'SalesTerritory')
-                  field: TerritoryID
+                  arguments:
+                    to: source('sales', 'SalesTerritory')
+                    field: TerritoryID
           - name: SalesQuota
             description: "Projected yearly sales. NULL if not applicable."
           - name: Bonus
@@ -291,22 +307,25 @@ sources:
             tests:
               - not_null
               - relationships:
-                  to: source('sales', 'SpecialOffer')
-                  field: SpecialOfferID
+                  arguments:
+                    to: source('sales', 'SpecialOffer')
+                    field: SpecialOfferID
           - name: ProductID
             description: "FK to Product.ProductID. Part of composite PK."
             tests:
               - not_null
               - relationships:
-                  to: source('production', 'Product')
-                  field: ProductID
+                  arguments:
+                    to: source('production', 'Product')
+                    field: ProductID
           - name: rowguid
             description: "ROWGUIDCOL number uniquely identifying the record."
           - name: ModifiedDate
             description: "Date and time the record was last updated."
         tests:
           - dbt_utils.unique_combination_of_columns:
-              combination_of_columns: [SpecialOfferID, ProductID]
+              arguments:
+                combination_of_columns: [SpecialOfferID, ProductID]
 
       - name: ShipMethod
         description: "Shipping method lookup with associated rates."
@@ -351,16 +370,18 @@ sources:
               - not_null
               - unique
               - relationships:
-                  to: source('person', 'BusinessEntity')
-                  field: BusinessEntityID
+                  arguments:
+                    to: source('person', 'BusinessEntity')
+                    field: BusinessEntityID
           - name: Name
             description: "Store name."
           - name: SalesPersonID
             description: "FK to SalesPerson — the assigned sales rep."
             tests:
               - relationships:
-                  to: source('sales', 'SalesPerson')
-                  field: BusinessEntityID
+                  arguments:
+                    to: source('sales', 'SalesPerson')
+                    field: BusinessEntityID
           - name: Demographics
             description: "Demographic information about the store such as annual sales and number of employees."
           - name: rowguid

@@ -24,12 +24,14 @@ sources:
             description: "0 = Product is purchased, 1 = Product is manufactured in-house."
             tests:
               - accepted_values:
-                  values: [0, 1]
+                  arguments:
+                    values: [0, 1]
           - name: FinishedGoodsFlag
             description: "0 = Product is not a salable item, 1 = Product is salable."
             tests:
               - accepted_values:
-                  values: [0, 1]
+                  arguments:
+                    values: [0, 1]
           - name: Color
             description: "Product color. NULL if not applicable."
           - name: SafetyStockLevel
@@ -63,8 +65,9 @@ sources:
             description: "Foreign key to ProductSubcategory. NULL if not categorised."
             tests:
               - relationships:
-                  to: source('production', 'ProductSubcategory')
-                  field: ProductSubcategoryID
+                  arguments:
+                    to: source('production', 'ProductSubcategory')
+                    field: ProductSubcategoryID
           - name: ProductModelID
             description: "Foreign key to ProductModel. NULL if no model assigned."
           - name: SellStartDate
@@ -89,8 +92,9 @@ sources:
             tests:
               - not_null
               - relationships:
-                  to: source('production', 'ProductCategory')
-                  field: ProductCategoryID
+                  arguments:
+                    to: source('production', 'ProductCategory')
+                    field: ProductCategoryID
           - name: Name
             description: "Subcategory description."
           - name: rowguid

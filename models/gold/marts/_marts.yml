@@ -16,15 +16,17 @@ models:
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 1
-              max_value: 4
+              arguments:
+                min_value: 1
+                max_value: 4
       - name: month_number
         description: "Calendar month (1–12) of the order date."
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 1
-              max_value: 12
+              arguments:
+                min_value: 1
+                max_value: 12
       - name: month_name
         description: "Full month name (e.g. January)."
         tests: [not_null]
@@ -51,20 +53,23 @@ models:
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 1
+              arguments:
+                min_value: 1
       - name: line_count
         description: "Total order line items in this slice."
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 1
-      # ── Volume ────────────────────────────────────────────────────────────
+              arguments:
+                min_value: 1
+        # ── Volume ────────────────────────────────────────────────────────────
       - name: units_sold
         description: "Total quantity of units sold (sum of order_qty)."
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 1
+              arguments:
+                min_value: 1
       - name: avg_units_per_order
         description: "Average units per distinct order (units_sold / order_count)."
       - name: avg_lines_per_order
@@ -75,39 +80,45 @@ models:
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: discount_amount
         description: "Total discount applied (gross_revenue − net_revenue). Always >= 0."
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: net_revenue
         description: "Actual recognised revenue after discounts (sum of line_total = gross_revenue − discount_amount)."
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
-      # ── Overhead ──────────────────────────────────────────────────────────
+              arguments:
+                min_value: 0
+        # ── Overhead ──────────────────────────────────────────────────────────
       - name: freight_allocated
         description: "Freight pro-rated to lines in this slice."
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: tax_allocated
         description: "Tax pro-rated to lines in this slice."
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
-      # ── Profitability ─────────────────────────────────────────────────────
+              arguments:
+                min_value: 0
+        # ── Profitability ─────────────────────────────────────────────────────
       - name: total_cost
         description: "COGS at standard cost for units sold (standard_cost × order_qty)."
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: gross_profit
         description: "Net revenue minus COGS only, before freight and tax (net_revenue − total_cost)."
         tests: [not_null]
@@ -118,16 +129,20 @@ models:
         description: "Mean net revenue per individual order line."
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - year_number
-            - quarter_number
-            - month_number
-            - territory_name
-            - category_name
-            - subcategory_name
+          arguments:
+            combination_of_columns:
+              - year_number
+              - quarter_number
+              - month_number
+              - territory_name
+              - category_name
+              - subcategory_name
       - dbt_utils.expression_is_true:
-          expression: "net_revenue <= gross_revenue"
+          arguments:
+            expression: "net_revenue <= gross_revenue"
       - dbt_utils.expression_is_true:
-          expression: "discount_amount >= 0 AND discount_amount = gross_revenue - net_revenue"
+          arguments:
+            expression: "discount_amount >= 0 AND discount_amount = gross_revenue - net_revenue"
       - dbt_utils.expression_is_true:
-          expression: "gross_profit = net_revenue - total_cost"
+          arguments:
+            expression: "gross_profit = net_revenue - total_cost"

@@ -17,8 +17,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_address')
-              field: address_bk
+              arguments:
+                to: ref('stg_address')
+                field: address_bk
       - name: address_type_id
         description: "Address type qualifier (1=Billing, 2=Home, 3=Main Office, 4=Primary, 5=Shipping, 6=Archive). Validated at the bronze layer."
         tests:
@@ -31,10 +32,11 @@ models:
         tests: [not_null]
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - business_entity_bk
-            - address_bk
-            - address_type_id
+          arguments:
+            combination_of_columns:
+              - business_entity_bk
+              - address_bk
+              - address_type_id
 
   - name: stg_person
     description: "One row per person — deduplicated, cleansed, with derived full_name and type."
@@ -87,8 +89,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_state_province')
-              field: state_province_bk
+              arguments:
+                to: ref('stg_state_province')
+                field: state_province_bk
       - name: postal_code
         description: "Postal or ZIP code."
         tests: [not_null]
@@ -121,8 +124,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_sales_territory')
-              field: sales_territory_bk
+              arguments:
+                to: ref('stg_sales_territory')
+                field: sales_territory_bk
       - name: modified_at
         description: "Timestamp of the last modification."
         tests: [not_null]
@@ -144,8 +148,9 @@ models:
         description: "FK to stg_sales_person — the assigned sales rep. Null if unassigned."
         tests:
           - relationships:
-              to: ref('stg_sales_person')
-              field: sales_person_bk
+              arguments:
+                to: ref('stg_sales_person')
+                field: sales_person_bk
       - name: row_guid
         description: "Globally unique identifier for the store."
         tests: [not_null, unique]
@@ -163,33 +168,38 @@ models:
         description: "FK to stg_person. Null for store-only (B2B) customers."
         tests:
           - relationships:
-              to: ref('stg_person')
-              field: person_bk
+              arguments:
+                to: ref('stg_person')
+                field: person_bk
       - name: store_bk
         description: "FK to stg_store. Null for individual (retail) customers."
         tests:
           - relationships:
-              to: ref('stg_store')
-              field: store_bk
+              arguments:
+                to: ref('stg_store')
+                field: store_bk
       - name: sales_territory_bk
         description: "FK to stg_sales_territory."
         tests:
           - relationships:
-              to: ref('stg_sales_territory')
-              field: sales_territory_bk
+              arguments:
+                to: ref('stg_sales_territory')
+                field: sales_territory_bk
       - name: account_number
         description: "Pre-computed customer account number in the format 'AW' + 8-digit zero-padded CustomerID."
         tests:
           - not_null
           - unique
           - dbt_expectations.expect_column_values_to_match_regex:
-              regex: '^AW[0-9]{8}$'
+              arguments:
+                regex: '^AW[0-9]{8}$'
       - name: customer_type
         description: "Derived customer type."
         tests:
           - not_null
           - accepted_values:
-              values: ["Individual", "Store", "StoreContact", "Unknown"]
+              arguments:
+                values: ["Individual", "Store", "StoreContact", "Unknown"]
       - name: row_guid
         description: "Globally unique identifier for the customer."
         tests: [not_null, unique]
@@ -212,7 +222,8 @@ models:
           - not_null
           - unique
           - dbt_expectations.expect_column_values_to_match_regex:
-              regex: '^SO[0-9]+$'
+              arguments:
+                regex: '^SO[0-9]+$'
       - name: order_date
         description: "Date the order was placed."
         tests: [not_null]
@@ -221,8 +232,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_customer')
-              field: customer_bk
+              arguments:
+                to: ref('stg_customer')
+                field: customer_bk
       - name: is_online_order
         description: "True if the order was placed online by the customer; false if placed by a sales person. Cast from OnlineOrderFlag."
       - name: order_status_code
@@ -232,34 +244,38 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values:
-                [
-                  "In process",
-                  "Approved",
-                  "Backordered",
-                  "Rejected",
-                  "Shipped",
-                  "Cancelled",
-                  "Unknown",
-                ]
+              arguments:
+                values:
+                  [
+                    "In process",
+                    "Approved",
+                    "Backordered",
+                    "Rejected",
+                    "Shipped",
+                    "Cancelled",
+                    "Unknown",
+                  ]
       - name: ship_method_bk
         description: "FK to stg_ship_method."
         tests:
           - relationships:
-              to: ref('stg_ship_method')
-              field: ship_method_bk
+              arguments:
+                to: ref('stg_ship_method')
+                field: ship_method_bk
       - name: credit_card_bk
         description: "FK to stg_credit_card. Null for non-credit-card orders."
         tests:
           - relationships:
-              to: ref('stg_credit_card')
-              field: credit_card_bk
+              arguments:
+                to: ref('stg_credit_card')
+                field: credit_card_bk
       - name: total_due
         description: "Total amount due including freight and tax."
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: ship_date
         description: "Date the order was shipped. Null if not yet shipped."
       - name: due_date
@@ -269,9 +285,11 @@ models:
         tests: [not_null]
     tests:
       - dbt_utils.expression_is_true:
-          expression: "ship_date IS NULL OR ship_date >= order_date"
+          arguments:
+            expression: "ship_date IS NULL OR ship_date >= order_date"
       - dbt_utils.expression_is_true:
-          expression: "due_date >= order_date"
+          arguments:
+            expression: "due_date >= order_date"
 
   - name: stg_sales_order_detail
     description: "Order line items — incremental MERGE on composite line key."
@@ -284,47 +302,54 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_sales_order_header')
-              field: sales_order_bk
+              arguments:
+                to: ref('stg_sales_order_header')
+                field: sales_order_bk
       - name: product_bk
         description: "FK to stg_product."
         tests:
           - not_null
           - relationships:
-              to: ref('stg_product')
-              field: product_bk
+              arguments:
+                to: ref('stg_product')
+                field: product_bk
       - name: special_offer_bk
         description: "FK to stg_special_offer."
         tests:
           - not_null
           - relationships:
-              to: ref('stg_special_offer')
-              field: special_offer_bk
+              arguments:
+                to: ref('stg_special_offer')
+                field: special_offer_bk
       - name: order_qty
         description: "Quantity ordered."
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 1
+              arguments:
+                min_value: 1
       - name: unit_price
         description: "Selling price per unit."
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: unit_price_discount
         description: "Discount as a decimal fraction (0.0 – 1.0)."
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
-              max_value: 1
+              arguments:
+                min_value: 0
+                max_value: 1
       - name: line_total
         description: "Computed line total: qty * unit_price * (1 – discount)."
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: modified_at
         description: "Timestamp of the last modification."
         tests: [not_null]
@@ -356,15 +381,17 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_sales_person')
-              field: sales_person_bk
+              arguments:
+                to: ref('stg_sales_person')
+                field: sales_person_bk
       - name: sales_territory_bk
         description: "FK to stg_sales_territory."
         tests:
           - not_null
           - relationships:
-              to: ref('stg_sales_territory')
-              field: sales_territory_bk
+              arguments:
+                to: ref('stg_sales_territory')
+                field: sales_territory_bk
       - name: start_at
         description: "Date the sales person started in this territory."
         tests: [not_null]
@@ -375,10 +402,11 @@ models:
         tests: [not_null]
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - sales_person_bk
-            - sales_territory_bk
-            - start_at
+          arguments:
+            combination_of_columns:
+              - sales_person_bk
+              - sales_territory_bk
+              - start_at
 
   - name: stg_sales_person
     description: "Sales person quota and commission data — deduplicated."
@@ -389,20 +417,23 @@ models:
           - not_null
           - unique
           - relationships:
-              to: ref('stg_employee')
-              field: employee_bk
+              arguments:
+                to: ref('stg_employee')
+                field: employee_bk
       - name: sales_territory_bk
         description: "FK to stg_sales_territory. Null if unassigned."
         tests:
           - relationships:
-              to: ref('stg_sales_territory')
-              field: sales_territory_bk
+              arguments:
+                to: ref('stg_sales_territory')
+                field: sales_territory_bk
       - name: commission_pct
         description: "Commission percentage as a decimal fraction."
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
-              max_value: 1
+              arguments:
+                min_value: 0
+                max_value: 1
       - name: modified_at
         description: "Timestamp of the last modification."
         tests: [not_null]
@@ -421,8 +452,9 @@ models:
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
-              max_value: 1
+              arguments:
+                min_value: 0
+                max_value: 1
       - name: offer_type
         description: "Type of offer (e.g. Seasonal Discount, Volume Discount)."
         tests: [not_null]
@@ -441,23 +473,26 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_special_offer')
-              field: special_offer_bk
+              arguments:
+                to: ref('stg_special_offer')
+                field: special_offer_bk
       - name: product_bk
         description: "FK to stg_product."
         tests:
           - not_null
           - relationships:
-              to: ref('stg_product')
-              field: product_bk
+              arguments:
+                to: ref('stg_product')
+                field: product_bk
       - name: modified_at
         description: "Timestamp of the last modification."
         tests: [not_null]
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - special_offer_bk
-            - product_bk
+          arguments:
+            combination_of_columns:
+              - special_offer_bk
+              - product_bk
 
 
   - name: stg_ship_method
@@ -473,12 +508,14 @@ models:
         description: "Fixed base shipping cost."
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: ship_rate
         description: "Per-weight shipping rate."
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: modified_at
         description: "Timestamp of the last modification."
         tests: [not_null]
@@ -497,14 +534,16 @@ models:
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_match_regex:
-              regex: '^X+[0-9]{4}$'
+              arguments:
+                regex: '^X+[0-9]{4}$'
       - name: exp_month
         description: "Expiry month (1-12)."
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 1
-              max_value: 12
+              arguments:
+                min_value: 1
+                max_value: 12
       - name: exp_year
         description: "Expiry year."
         tests: [not_null]
@@ -536,18 +575,21 @@ models:
         description: "Current list price."
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: standard_cost
         description: "Standard manufacturing cost."
         tests:
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: product_subcategory_bk
         description: "FK to stg_product_subcategory. Null for uncategorised products."
         tests:
           - relationships:
-              to: ref('stg_product_subcategory')
-              field: product_subcategory_bk
+              arguments:
+                to: ref('stg_product_subcategory')
+                field: product_subcategory_bk
       - name: modified_at
         description: "Timestamp of the last modification."
         tests: [not_null]
@@ -555,26 +597,30 @@ models:
         description: "Product line designation. R = Road, M = Mountain, T = Touring, S = Standard."
         tests:
           - accepted_values:
-              values: ['R', 'M', 'T', 'S']
+              arguments:
+                values: ['R', 'M', 'T', 'S']
               config:
                 where: "product_line is not null"
       - name: product_class
         description: "Product class. H = High, M = Medium, L = Low."
         tests:
           - accepted_values:
-              values: ['H', 'M', 'L']
+              arguments:
+                values: ['H', 'M', 'L']
               config:
                 where: "product_class is not null"
       - name: product_style
         description: "Product style. W = Womens, M = Mens, U = Universal."
         tests:
           - accepted_values:
-              values: ['W', 'M', 'U']
+              arguments:
+                values: ['W', 'M', 'U']
               config:
                 where: "product_style is not null"
     tests:
       - dbt_utils.expression_is_true:
-          expression: "CAST(standard_cost AS DECIMAL(18,2)) <= CAST(list_price AS DECIMAL(18,2)) OR list_price = 0"
+          arguments:
+            expression: "CAST(standard_cost AS DECIMAL(18,2)) <= CAST(list_price AS DECIMAL(18,2)) OR list_price = 0"
 
   - name: stg_product_subcategory
     description: "Product subcategory reference — deduplicated."
@@ -587,8 +633,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_product_category')
-              field: product_category_bk
+              arguments:
+                to: ref('stg_product_category')
+                field: product_category_bk
       - name: subcategory_name
         description: "Subcategory name."
         tests: [not_null]
@@ -650,8 +697,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_employee')
-              field: employee_bk
+              arguments:
+                to: ref('stg_employee')
+                field: employee_bk
       - name: rate_change_at
         description: "Date the pay rate change took effect. Part of composite PK. Cast to timestamp."
         tests: [not_null]
@@ -660,7 +708,8 @@ models:
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: pay_frequency
         description: "Payment frequency. 1 = Monthly, 2 = Bi-weekly. Validated at the bronze layer."
         tests:
@@ -670,9 +719,10 @@ models:
         tests: [not_null]
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - employee_bk
-            - rate_change_at
+          arguments:
+            combination_of_columns:
+              - employee_bk
+              - rate_change_at
 
   - name: stg_employee_dept_history
     description: "Employee department and shift history — deduplicated. end_date null = currently active."
@@ -682,8 +732,9 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('stg_employee')
-              field: employee_bk
+              arguments:
+                to: ref('stg_employee')
+                field: employee_bk
       - name: department_bk
         description: "Department ID."
         tests: [not_null]
@@ -700,8 +751,9 @@ models:
         tests: [not_null]
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - employee_bk
-            - department_bk
-            - shift_bk
-            - start_date
+          arguments:
+            combination_of_columns:
+              - employee_bk
+              - department_bk
+              - shift_bk
+              - start_date

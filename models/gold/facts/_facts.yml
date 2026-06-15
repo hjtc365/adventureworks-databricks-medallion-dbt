@@ -8,9 +8,10 @@ models:
       are allocated proportionally to line_total.
     tests:
       - dbt_utils.unique_combination_of_columns:
-          combination_of_columns:
-            - sales_order_bk
-            - sales_order_detail_bk
+          arguments:
+            combination_of_columns:
+              - sales_order_bk
+              - sales_order_detail_bk
     columns:
       - name: sales_order_line_sk
         tests: [not_null, unique]
@@ -22,113 +23,133 @@ models:
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_match_regex:
-              regex: '^\\d+-\\d+$'
+              arguments:
+                regex: '^\\d+-\\d+$'
       - name: order_date
         tests:
           - not_null
           - dbt_utils.expression_is_true:
-              expression: ">= '1990-01-01' and order_date <= '2030-12-31'"
+              arguments:
+                expression: ">= '1990-01-01' and order_date <= '2030-12-31'"
               config:
                 where: "order_date is not null"
       - name: order_date_sk
         tests:
           - not_null
           - relationships:
-              to: ref('dim_date')
-              field: date_sk
+              arguments:
+                to: ref('dim_date')
+                field: date_sk
       - name: ship_date_sk
         tests:
           - relationships:
-              to: ref('dim_date')
-              field: date_sk
+              arguments:
+                to: ref('dim_date')
+                field: date_sk
               config:
                 where: "ship_date_sk <> -1"
       - name: due_date_sk
         tests:
           - relationships:
-              to: ref('dim_date')
-              field: date_sk
+              arguments:
+                to: ref('dim_date')
+                field: date_sk
               config:
                 where: "due_date_sk <> -1"
       - name: customer_sk
         tests:
           - not_null
           - relationships:
-              to: ref('dim_customer')
-              field: customer_sk
+              arguments:
+                to: ref('dim_customer')
+                field: customer_sk
       - name: product_sk
         tests:
           - not_null
           - relationships:
-              to: ref('dim_product')
-              field: product_sk
+              arguments:
+                to: ref('dim_product')
+                field: product_sk
       - name: employee_sk
         tests:
           - not_null
           - relationships:
-              to: ref('dim_employee')
-              field: employee_sk
+              arguments:
+                to: ref('dim_employee')
+                field: employee_sk
       - name: sales_territory_sk
         tests:
           - not_null
           - relationships:
-              to: ref('dim_salesterritory')
-              field: sales_territory_sk
+              arguments:
+                to: ref('dim_salesterritory')
+                field: sales_territory_sk
       - name: special_offer_sk
         tests:
           - not_null
           - relationships:
-              to: ref('dim_special_offer')
-              field: special_offer_sk
+              arguments:
+                to: ref('dim_special_offer')
+                field: special_offer_sk
       - name: sales_order_junk_sk
         tests:
           - not_null
           - relationships:
-              to: ref('dim_sales_order_junk')
-              field: sales_order_junk_sk
+              arguments:
+                to: ref('dim_sales_order_junk')
+                field: sales_order_junk_sk
       - name: order_qty
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 1
+              arguments:
+                min_value: 1
       - name: unit_price
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: unit_price_discount
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
-              max_value: 1
+              arguments:
+                min_value: 0
+                max_value: 1
       - name: line_total
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: discount_amount
         description: "Discount applied to the line — computed as (unit_price * order_qty) - line_total. Always >= 0; zero when no discount is applied. Note: this represents the UnitPriceDiscount reduction on the committed unit price, NOT the difference from the product's list_price."
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: allocated_freight
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: allocated_tax
         tests:
           - not_null
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: line_total_with_overhead
         tests:
           - not_null
           - dbt_utils.expression_is_true:
-              expression: ">= line_total"
+              arguments:
+                expression: ">= line_total"
           - dbt_expectations.expect_column_values_to_be_between:
-              min_value: 0
+              arguments:
+                min_value: 0
       - name: updated_at
         tests: [not_null]

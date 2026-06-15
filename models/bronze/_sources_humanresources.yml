@@ -23,8 +23,9 @@ sources:
               - not_null
               - unique
               - relationships:
-                  to: source('person', 'BusinessEntity')
-                  field: BusinessEntityID
+                  arguments:
+                    to: source('person', 'BusinessEntity')
+                    field: BusinessEntityID
           - name: NationalIDNumber
             description: "Unique national identification number such as a social security number."
           - name: LoginID
@@ -41,19 +42,22 @@ sources:
             description: "Marital status of the employee. M = Married, S = Single."
             tests:
               - accepted_values:
-                  values: ['M', 'S']
+                  arguments:
+                    values: ['M', 'S']
           - name: Gender
             description: "Gender of the employee. M = Male, F = Female."
             tests:
               - accepted_values:
-                  values: ['M', 'F']
+                  arguments:
+                    values: ['M', 'F']
           - name: HireDate
             description: "Date the employee was hired."
           - name: SalariedFlag
             description: "1 = Salaried employee. 0 = Hourly employee."
             tests:
               - accepted_values:
-                  values: [0, 1]
+                  arguments:
+                    values: [0, 1]
           - name: VacationHours
             description: "Number of available vacation hours."
           - name: SickLeaveHours
@@ -62,7 +66,8 @@ sources:
             description: "1 = Active employee. 0 = Inactive employee."
             tests:
               - accepted_values:
-                  values: [0, 1]
+                  arguments:
+                    values: [0, 1]
           - name: rowguid
             description: "ROWGUIDCOL number uniquely identifying the record."
           - name: ModifiedDate
@@ -76,8 +81,9 @@ sources:
             tests:
               - not_null
               - relationships:
-                  to: source('humanresources', 'Employee')
-                  field: BusinessEntityID
+                  arguments:
+                    to: source('humanresources', 'Employee')
+                    field: BusinessEntityID
           - name: RateChangeDate
             description: "Date the pay rate change took effect. Part of composite PK."
             tests: [not_null]
@@ -87,7 +93,8 @@ sources:
             description: "Payment frequency. 1 = Monthly, 2 = Biweekly."
             tests:
               - accepted_values:
-                  values: [1, 2]
+                  arguments:
+                    values: [1, 2]
           - name: ModifiedDate
             description: "Date and time the record was last updated."
 
@@ -99,8 +106,9 @@ sources:
             tests:
               - not_null
               - relationships:
-                  to: source('humanresources', 'Employee')
-                  field: BusinessEntityID
+                  arguments:
+                    to: source('humanresources', 'Employee')
+                    field: BusinessEntityID
           - name: DepartmentID
             description: "Foreign key to Department.DepartmentID. Part of composite PK."
             tests: [not_null]
