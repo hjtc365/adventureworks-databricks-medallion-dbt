@@ -17,7 +17,7 @@
     -- Identifies the employee across snapshot versions. dbt uses this to
     -- match incoming rows to existing open records before diffing.
     --
-    -- invalidate_hard_deletes: true
+    -- hard_deletes: "invalidate"
     -- If an employee disappears from int_employee_details (e.g. terminated
     -- and removed from the source), the open snapshot row is closed by
     -- setting dbt_valid_to to the current timestamp rather than being left
@@ -41,7 +41,7 @@
                 "is_current",
                 "marital_status",
             ],
-            invalidate_hard_deletes=true,
+            hard_deletes="invalidate"
         )
     }}
 

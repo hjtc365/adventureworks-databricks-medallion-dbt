@@ -15,7 +15,7 @@
     -- Identifies the territory across snapshot versions. dbt uses this to
     -- match incoming rows to existing open records before diffing.
     --
-    -- invalidate_hard_deletes: true
+    -- hard_deletes: "invalidate"
     -- If a territory disappears from int_territory_current (e.g. removed from
     -- the source system), the open snapshot row is closed by setting
     -- dbt_valid_to to the current timestamp rather than being left open
@@ -34,7 +34,7 @@
                 "territory_group",
                 "current_sales_person_bk",
             ],
-            invalidate_hard_deletes=true,
+            hard_deletes="invalidate"
         )
     }}
 

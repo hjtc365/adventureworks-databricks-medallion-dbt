@@ -56,7 +56,7 @@ snapshots:
     +schema: gold
     +file_format: delta
     +strategy: check
-    +invalidate_hard_deletes: true
+    +hard_deletes: invalidate
 
 # Pipeline observability hooks
 on-run-start:

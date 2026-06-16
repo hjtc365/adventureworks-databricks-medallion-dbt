@@ -16,7 +16,7 @@
     -- Identifies the product across snapshot versions. dbt uses this to
     -- match incoming rows to existing open records before diffing.
     --
-    -- invalidate_hard_deletes: true
+    -- hard_deletes: "invalidate"
     -- If a product disappears from int_product_enriched (e.g. removed from
     -- the source system), the open snapshot row is closed by setting
     -- dbt_valid_to to the current timestamp rather than being left open
@@ -42,7 +42,7 @@
                 "color",
                 "size",
             ],
-            invalidate_hard_deletes=true,
+            hard_deletes="invalidate"
         )
     }}
 
