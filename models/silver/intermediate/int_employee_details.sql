@@ -59,7 +59,7 @@ select
     e.gender,
     e.hire_date,
     e.is_salaried,
-    e.is_current,
+    e.is_active_employee,
     e.vacation_hours,
     e.sick_leave_hours,
     pay.pay_rate,

@@ -23,12 +23,12 @@ with
             is_salaried,
             pay_rate,
             pay_frequency,
-            is_current,
+            is_active_employee,
             dbt_valid_from as valid_from,
             dbt_valid_to as valid_to,
             case
                 when dbt_valid_to is null then true else false
-            end as is_current_version,
+            end as is_current,
             false as is_unknown
         from snap
     ),
@@ -56,10 +56,10 @@ with
             cast(null as boolean) as is_salaried,
             cast(null as decimal(19, 4)) as pay_rate,
             cast(null as int) as pay_frequency,
-            cast(null as boolean) as is_current,
+            cast(null as boolean) as is_active_employee,
             cast('1900-01-01' as timestamp) as valid_from,
             cast(null as timestamp) as valid_to,
-            true as is_current_version,
+            true as is_current,
             true as is_unknown
     )
 

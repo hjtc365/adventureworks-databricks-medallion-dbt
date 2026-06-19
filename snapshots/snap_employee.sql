@@ -62,7 +62,7 @@
         gender,
         hire_date,
         is_salaried,
-        is_current,
+        is_active_employee,
         pay_rate,
         pay_frequency
     from {{ ref("int_employee_details") }}

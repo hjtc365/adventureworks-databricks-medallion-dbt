@@ -29,7 +29,8 @@ select
     cast(salariedflag as boolean) as is_salaried,
     cast(vacationhours as int) as vacation_hours,
     cast(sickleavehours as int) as sick_leave_hours,
-    cast(currentflag as boolean) as is_current,
+    -- Is this person still employed?
+    cast(currentflag as boolean) as is_active_employee,
     rowguid as row_guid,
     cast(left(modifieddate, 19) as timestamp) as modified_at
 from deduplicated
