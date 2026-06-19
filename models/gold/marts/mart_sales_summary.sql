@@ -6,7 +6,8 @@ with
     f as (select * from {{ ref("fct_sales_detail") }}),
     dt as (select * from {{ ref("dim_date") }}),
     dp as (select * from {{ ref("dim_product") }}),
-    dst as (select * from {{ ref("dim_salesterritory") }})
+    dst as (select * from {{ ref("dim_salesterritory") }}),
+    em as (select * from {{ ref("dim_employee") }})
 
 select
     -- dates
@@ -23,6 +24,10 @@ select
     -- product
     dp.category_name as category_name,
     dp.subcategory_name as subcategory_name,
+
+    -- employee (sales rep)
+    em.employee_bk as employee_bk,
+    em.full_name as employee_name,
 
     -- order counts
     count(distinct f.sales_order_bk) as order_count,
@@ -78,6 +83,7 @@ from f
 left join dt on dt.date_sk = f.order_date_sk
 left join dp on dp.product_sk = f.product_sk
 left join dst on dst.sales_territory_sk = f.sales_territory_sk
+left join em on em.employee_sk = f.sales_person_sk
 group by
     dt.year_number,
     dt.quarter_number,
@@ -87,4 +93,5 @@ group by
     dst.country_region_code,
     dst.territory_group,
     dp.category_name,
-    dp.subcategory_name
+    dp.subcategory_name,
+    em.employee_bk
