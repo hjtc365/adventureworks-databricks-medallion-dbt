@@ -113,7 +113,7 @@ models:
         tests: [not_null]
       - name: valid_from
         tests: [not_null]
-      - name: is_current_version
+      - name: is_active_employee
         tests: [not_null]
       - name: login_id
         tests:
