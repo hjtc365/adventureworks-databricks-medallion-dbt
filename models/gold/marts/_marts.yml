@@ -5,7 +5,14 @@ models:
     description: >
       Pre-aggregated sales summary by territory + product category + month.
       Powers BI dashboards directly without re-computing aggregations.
-      Grain: one row per (year_number, quarter_number, month_number, territory_name, category_name, subcategory_name).
+      Grain: one row per (year_number, quarter_number, month_number,
+      sales_territory_bk + territory_name + country_region_code + territory_group,
+      product_category_bk + category_name,
+      product_subcategory_bk + subcategory_name,
+      employee_bk).
+      Territory and product attributes are point-in-time (SCD2 _sk join), so a
+      mid-month rename produces two slices for that month. Employee full_name
+      is always the current version and does not split slices.
     columns:
       # ── Date ──────────────────────────────────────────────────────────────
       - name: year_number
@@ -31,6 +38,9 @@ models:
         description: "Full month name (e.g. January)."
         tests: [not_null]
       # ── Territory ─────────────────────────────────────────────────────────
+      - name: sales_territory_bk
+        description: "Business key for the sales territory (natural key from the source system)."
+        tests: [not_null]
       - name: territory_name
         description: "Sales territory name."
         tests: [not_null]
@@ -41,6 +51,12 @@ models:
         description: "Regional group (e.g. North America, Europe)."
         tests: [not_null]
       # ── Product ───────────────────────────────────────────────────────────
+      - name: product_category_bk
+        description: "Business key for the product category."
+        tests: [not_null]
+      - name: product_subcategory_bk
+        description: "Business key for the product subcategory."
+        tests: [not_null]
       - name: category_name
         description: "Top-level product category name."
         tests: [not_null]
@@ -134,9 +150,15 @@ models:
               - year_number
               - quarter_number
               - month_number
+              - sales_territory_bk
               - territory_name
+              - country_region_code
+              - territory_group
+              - product_category_bk
               - category_name
+              - product_subcategory_bk
               - subcategory_name
+              - employee_bk
       - dbt_utils.expression_is_true:
           arguments:
             expression: "net_revenue <= gross_revenue"
