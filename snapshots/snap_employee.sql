@@ -38,7 +38,7 @@
                 "pay_rate",
                 "pay_frequency",
                 "is_salaried",
-                "is_current",
+                "is_active_employee",
                 "marital_status",
             ],
             hard_deletes="invalidate"
