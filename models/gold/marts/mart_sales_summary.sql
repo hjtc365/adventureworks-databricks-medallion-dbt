@@ -64,7 +64,7 @@ with
             coalesce(dp.subcategory_name, 'Unknown') as subcategory_name,
 
             -- employee grain key (display name resolved post-agg)
-            em.employee_bk as employee_bk,
+            dem.employee_bk as employee_bk,
 
             -- order counts
             count(distinct f.sales_order_bk) as order_count,
