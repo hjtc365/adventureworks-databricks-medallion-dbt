@@ -6,5 +6,4 @@ logs/
 .venv/
 .vscode/
 .github/
-**/todo/
-resources/
+_others/
