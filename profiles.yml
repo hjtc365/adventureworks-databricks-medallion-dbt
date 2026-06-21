@@ -1,0 +1,19 @@
+adventureworks:
+  target: dev
+  outputs:
+    dev:
+      type: databricks
+      catalog: adventureworks_dev
+      schema: default
+      host: "{{ env_var('DBT_DBX_HOST') }}"
+      http_path: "{{ env_var('DBT_DBX_HTTP_PATH') }}"
+      token: "{{ env_var('DBT_DBX_TOKEN') }}"
+      threads: 4
+    prod:
+      type: databricks
+      catalog: adventureworks_prod
+      schema: default
+      host: "{{ env_var('DBT_DBX_HOST') }}"
+      http_path: "{{ env_var('DBT_DBX_HTTP_PATH_PROD') }}"
+      token: "{{ env_var('DBT_DBX_TOKEN') }}"
+      threads: 8
