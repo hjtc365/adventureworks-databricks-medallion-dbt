@@ -72,7 +72,7 @@ flowchart LR
 adventureworks-databricks-medallion-dbt/
 ├── dbt_project.yml          # project config, materialisations, persist_docs, hooks
 ├── packages.yml             # dbt_utils, dbt_expectations, codegen
-├── profiles.yml             # NOT here — lives in ~/.dbt/ (see setup below)
+├── profiles.yml             # committed to the repo — all values use env_var(), no secrets hard-coded
 ├── macros/
 │   ├── generate_schema_name.sql      # dev/ci/prod schema isolation
 │   └── test_scd2_no_date_overlap.sql # custom SCD2 integrity test
@@ -244,27 +244,12 @@ This downloads `dbt_utils`, `dbt_expectations`, and `codegen` into
 
 ### 7. Configure `profiles.yml`
 
-`profiles.yml` describes **how your machine connects to Databricks**. It lives
-in your home directory, **not** in the repo, because it's machine-specific and
-references a secret token.
+`profiles.yml` describes **how dbt connects to Databricks**. It is already
+present in the **repo root** and is safe to commit to source control because
+every sensitive value is read from an environment variable at runtime using
+dbt's `env_var()` function — no credentials are hard-coded in the file.
 
-Create the `.dbt` folder:
-
-**Windows PowerShell**
-
-```powershell
-mkdir $env:USERPROFILE\.dbt -ErrorAction SilentlyContinue
-```
-
-**macOS / Linux**
-
-```bash
-mkdir -p ~/.dbt
-```
-
-Then create `~/.dbt/profiles.yml` (Windows: `%USERPROFILE%\.dbt\profiles.yml`)
-with this content. Secrets are read from environment variables, not hard-coded
-— so the file itself is safe to keep and share.
+Open `profiles.yml` and verify the contents look like this:
 
 ```yaml
 adventureworks:
@@ -288,6 +273,11 @@ adventureworks:
       threads: 8
 ```
 
+No changes are needed. dbt locates `profiles.yml` by checking the current
+working directory before falling back to `~/.dbt/`, so running dbt from the
+repo root (which `dbt build`, `dbt debug`, etc. all do by default) is enough
+— no `--profiles-dir` flag required.
+
 > The profile name `adventureworks` must match `profile: 'adventureworks'` in
 > `dbt_project.yml`. The only difference between `dev` and `prod` is the
 > **catalog** — same warehouse, different Unity Catalog catalog, so dev
@@ -299,6 +289,12 @@ dbt reads your Databricks credentials and your developer name from environment
 variables at runtime. `DBT_USER` is consumed by the `generate_schema_name`
 macro to prefix your dev schemas (e.g. `alice_silver`) so multiple developers
 never collide in the shared dev catalog.
+
+> **Replace every placeholder value below with your own before running.**
+> - `dbc-xxxxxxxx-xxxx.cloud.databricks.com` → your workspace **Server hostname** (no `https://`, no trailing `/`)
+> - `/sql/1.0/warehouses/abc123def456` → your SQL Warehouse **HTTP path**
+> - `dapiXXXX...` → your **Personal Access Token** (the `dapi…` string from Step 1)
+> - `alice` → your chosen **dbt user prefix** (used to name your dev schemas, e.g. `alice_silver`)
 
 **Windows PowerShell — current session**
 
@@ -499,12 +495,12 @@ databricks secrets list-scopes
 databricks secrets list-secrets aw   # should list: host, http_path, dbt_token, dbt_user
 ```
 
-> `host` is the workspace hostname **without** `https://` and **without** a
-> trailing `/`. `http_path` is the SQL Warehouse's HTTP path from
-> **Connection details**. `dbt_token` is the same Databricks PAT you put in
-> `~/.dbt/profiles.yml`. `dbt_user` is the value that the
-> `generate_schema_name` macro uses to prefix dev schemas (e.g. `alice`
-> produces `alice_silver`, `alice_gold`).
+| Secret key | Value to supply |
+|------------|-----------------|
+| `host` | Workspace **Server hostname** — no `https://`, no trailing `/` |
+| `http_path` | SQL Warehouse **HTTP path** from **Connection details** |
+| `dbt_token` | Your Databricks **Personal Access Token** (`dapi…`) |
+| `dbt_user` | Your dbt user prefix — the `generate_schema_name` macro uses this to isolate dev schemas (e.g. `alice` → `alice_silver`, `alice_gold`) |
 
 ### Step 2 — Clone the repo as a Databricks Git folder
 
