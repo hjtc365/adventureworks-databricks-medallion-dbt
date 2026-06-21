@@ -110,20 +110,27 @@ The steps below take you from a clean machine to a fully built, tested
 warehouse. Commands are shown for **Windows PowerShell** and **macOS/Linux
 bash**.
 
-### 1. Stand up Databricks and collect 3 credentials
+### 1. Set up Databricks and collect the required connection details
 
 In your Databricks Free Edition workspace:
 
-1. **Create a SQL Warehouse** (or use the default serverless one). Open it →
-   **Connection details** and note:
-   - **Server hostname** — e.g. `dbc-xxxxxxxx-xxxx.cloud.databricks.com`
-     (no `https://`, no trailing `/`)
-   - **HTTP path** — e.g. `/sql/1.0/warehouses/abc123def456`
-2. **Create a Personal Access Token (PAT):** avatar → **Settings** →
-   **Developer** → **Access tokens** → **Generate new token**. Copy the
-   `dapi…` value — you only see it once.
+1. **Create a SQL Warehouse** (or use the default serverless warehouse).
+   Open the warehouse → **Connection details** and record:
 
-You now have the three secrets dbt needs: **host**, **http_path**, **token**.
+   * **Server hostname** — e.g. `dbc-xxxxxxxx-xxxx.cloud.databricks.com`
+     *(Do not include `https://` or a trailing `/`.)*
+
+   * **HTTP path** — e.g. `/sql/1.0/warehouses/abc123def456`
+
+2. **Create a Personal Access Token (PAT):**
+   Go to **Avatar → Settings → Developer → Access tokens → Generate new token**.
+   Copy the `dapi...` value immediately — it is only displayed once.
+
+You now have the three values dbt needs to connect to Databricks:
+
+* `host`
+* `http_path`
+* `token`
 
 ### 2. Clone the repo
 
@@ -307,9 +314,11 @@ To persist them across PowerShell sessions, use
 `[Environment]::SetEnvironmentVariable`:
 
 ```powershell
-[Environment]::SetEnvironmentVariable('DBT_DBX_HOST', 'dbc-xxxx.cloud.databricks.com', 'User')
+[Environment]::SetEnvironmentVariable('DBT_DBX_HOST', 'dbc-xxxxxxxx-xxxx.cloud.databricks.com', 'User')
+[Environment]::SetEnvironmentVariable('DBT_DBX_HTTP_PATH', '/sql/1.0/warehouses/abc123def456', 'User')
+[Environment]::SetEnvironmentVariable('DBT_DBX_HTTP_PATH_PROD', '/sql/1.0/warehouses/abc123def456', 'User')
+[Environment]::SetEnvironmentVariable('DBT_DBX_TOKEN', 'dapiXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', 'User')
 [Environment]::SetEnvironmentVariable('DBT_USER', 'alice', 'User')
-# …repeat for the other variables, then restart your terminal.
 ```
 
 **macOS / Linux — current session**
@@ -389,6 +398,164 @@ environment-specific schema so `dev`, `ci`, and `prod` never collide:
 
 This is what lets a whole team share one `adventureworks_dev` catalog, and what
 makes pull-request CI builds disposable (drop `pr_42_*` after merge).
+
+---
+
+## Automating builds with Databricks Jobs
+
+The two notebooks (`bronze_bootstrap` and `run_dbt`) can be wired together as
+Databricks Jobs so that a **single click loads both `dev` and `prod`** end to
+end. The setup uses **four jobs** arranged in a layered hierarchy: two *leaf*
+jobs that each wrap one notebook, a *pipeline* job that chains them for one
+environment, and an *orchestrator* job that fans the pipeline out across every
+environment.
+
+```mermaid
+flowchart TD
+    O["environment-orchestrator<br/>for_each environments = [dev, prod]"]
+    P["environment-pipeline<br/>param: environment"]
+    B["bronze-bootstrap<br/>param: catalog"]
+    R["run-dbt<br/>param: target"]
+
+    O -->|environment = dev| P
+    O -->|environment = prod| P
+    P -->|catalog = adventureworks_#123;#123;environment#125;#125;| B
+    B --> R
+    R -.->|target = #123;#123;environment#125;#125;| R
+```
+
+| Job | Role | Runs | Key parameter |
+|-----|------|------|---------------|
+| **bronze-bootstrap** | leaf | `notebooks/bronze_bootstrap` | `catalog` (default `adventureworks_dev`) |
+| **run-dbt** | leaf | `notebooks/run_dbt` | `target` (default `dev`) |
+| **environment-pipeline** | chains the two leaves for one env | bronze-bootstrap → run-dbt | `environment` (default `dev`) |
+| **environment-orchestrator** | fans the pipeline across all envs | environment-pipeline per env | `environments` (default `["dev", "prod"]`) |
+
+### How the parameters flow
+
+1. **environment-orchestrator** holds a JSON array parameter `environments`
+   (default `["dev", "prod"]`) and uses a **`for_each` task** to run
+   **environment-pipeline** once per element, passing each value through as
+   `environment = {{input}}`.
+2. **environment-pipeline** receives a single `environment` and runs the two
+   leaf jobs in order:
+   - **bronze-bootstrap** with `catalog = adventureworks_{{environment}}`
+   - **run-dbt** with `target = {{environment}}` (only after bronze-bootstrap
+     succeeds — see `depends_on`)
+3. The leaf jobs hand those values straight to the notebook widgets
+   (`catalog` and `target`), so the same notebooks serve every environment.
+
+This is why building both catalogs is one action: run
+**environment-orchestrator** and it loops `dev` then `prod`, each time
+bootstrapping Bronze into `adventureworks_<env>` and then running
+`dbt build --target <env>`.
+
+> For CI/CD pipelines and repeatable deployments across workspaces, these four
+> jobs can also be defined as a **Databricks Asset Bundle** and deployed with
+> the Databricks CLI instead of the Workflows UI.
+
+### Step 1 — Create the `aw` Databricks Secret scope
+
+The `run_dbt` notebook reads five values from a Databricks Secret scope named
+`aw`. The scope must exist **before** any of the jobs run, otherwise the
+`run-dbt` task fails with `SecretNotFound`.
+
+You need the **v0.205+ Databricks CLI** for this (the new Go-based CLI, not
+the legacy `pip install databricks-cli` package). Install once:
+
+```bash
+# Windows
+winget install Databricks.DatabricksCLI
+
+# macOS
+brew tap databricks/tap && brew install databricks
+
+# Linux / other
+curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+```
+
+Authenticate against your workspace (opens a browser):
+
+```bash
+databricks auth login --host https://dbc-xxxxxxxx-xxxx.cloud.databricks.com
+```
+
+Create the scope and populate the five keys. Values are sent over TLS and
+never echoed back to the terminal.
+
+```bash
+databricks secrets create-scope aw
+
+databricks secrets put-secret aw host       --string-value "dbc-xxxxxxxx-xxxx.cloud.databricks.com"
+databricks secrets put-secret aw http_path  --string-value "/sql/1.0/warehouses/abc123def456"
+databricks secrets put-secret aw dbt_token  --string-value "dapiXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+databricks secrets put-secret aw dbt_user   --string-value "<your-dbt-user-prefix>"
+```
+
+Verify:
+
+```bash
+databricks secrets list-scopes
+databricks secrets list-secrets aw   # should list: host, http_path, dbt_token, dbt_user
+```
+
+> `host` is the workspace hostname **without** `https://` and **without** a
+> trailing `/`. `http_path` is the SQL Warehouse's HTTP path from
+> **Connection details**. `dbt_token` is the same Databricks PAT you put in
+> `~/.dbt/profiles.yml`. `dbt_user` is the value that the
+> `generate_schema_name` macro uses to prefix dev schemas (e.g. `alice`
+> produces `alice_silver`, `alice_gold`).
+
+### Step 2 — Clone the repo as a Databricks Git folder
+
+Databricks now recommends creating Git folders from your **home folder** rather
+than under the legacy `/Repos` path:
+
+1. In the workspace UI, navigate to **Workspace → Home**.
+2. Click **Create → Git folder** (top-right button).
+3. Paste the HTTPS URL of your fork:
+   `https://github.com/<your-github-username>/adventureworks-databricks-medallion-dbt.git`
+4. Leave the folder name as-is and click **Create Git folder**.
+
+This clones the repo under
+`/Workspace/Users/<you>@example.com/adventureworks-databricks-medallion-dbt`,
+which is the path used in the `notebook_path` values below — adjust them if
+you chose a different location.
+
+> The legacy path **Workspace → Repos → Add repo** still works if you prefer
+> it; your folder will be visible under `/Workspace/Repos/<you>@example.com/`
+> instead.
+
+### Step 3 — Build the four jobs in the Workflows UI
+
+Create the jobs **bottom-up** so each parent can pick its children's job IDs
+from the dropdown:
+
+1. **bronze-bootstrap** — new Job → single **Notebook** task pointing at
+   `notebooks/bronze_bootstrap`. Add a job parameter `catalog` =
+   `adventureworks_dev`.
+2. **run-dbt** — new Job → single **Notebook** task pointing at
+   `notebooks/run_dbt`. Add a job parameter `target` = `dev`. Use a bare
+   serverless environment — **do not** add `dbt-databricks` as a job
+   dependency. The notebook installs its own pinned version via
+   `%pip install "dbt-databricks==1.12.*"` and restarts Python, so declaring it
+   at the job level is redundant and risks a version mismatch.
+3. **environment-pipeline** — new Job with two **Run Job** tasks:
+   - `bronze-bootstrap` → run the bronze-bootstrap job with
+     `catalog = adventureworks_{{job.parameters.environment}}`.
+   - `run-dbt` → **depends on** `bronze-bootstrap`, runs the run-dbt job with
+     `target = {{job.parameters.environment}}`.
+   - Add a job parameter `environment` = `dev`.
+4. **environment-orchestrator** — new Job with one **For each** task whose
+   input is `{{job.parameters.environments}}`; the nested task is a **Run Job**
+   on environment-pipeline with `environment = {{input}}`. Add a job parameter
+   `environments` = `["dev", "prod"]`.
+
+### Step 4 — Run
+
+Run **environment-orchestrator** to load `dev` and `prod` in one go, or run
+**environment-pipeline** with `environment=dev` (or `prod`) to load a single
+environment.
 
 ---
 
