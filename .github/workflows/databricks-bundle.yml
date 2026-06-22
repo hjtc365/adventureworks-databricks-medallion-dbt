@@ -25,11 +25,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-
-      - run: pip install databricks-sdk
+      - name: Set up Databricks CLI
+        uses: databricks/setup-cli@main
 
       - name: Validate bundle
         run: databricks bundle validate
@@ -49,11 +46,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-
-      - run: pip install databricks-sdk
+      - name: Set up Databricks CLI
+        uses: databricks/setup-cli@main
 
       - name: Set preview target
         id: env
@@ -80,11 +74,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-
-      - run: pip install databricks-sdk
+      - name: Set up Databricks CLI
+        uses: databricks/setup-cli@main
 
       - name: Deploy to Dev
         env:
@@ -105,11 +96,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-
-      - run: pip install databricks-sdk
+      - name: Set up Databricks CLI
+        uses: databricks/setup-cli@main
 
       - name: Deploy to Prod
         env:
