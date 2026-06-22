@@ -1,0 +1,15 @@
+resources:
+  jobs:
+    bronze_bootstrap:
+      name: bronze-bootstrap
+      tasks:
+        - task_key: bronze-bootstrap
+          notebook_task:
+            notebook_path: /Workspace/Users/hjtc365@gmail.com/adventureworks-databricks-medallion-dbt/notebooks/bronze_bootstrap
+            source: WORKSPACE
+      queue:
+        enabled: true
+      parameters:
+        - name: catalog
+          default: adventureworks_dev
+      performance_target: PERFORMANCE_OPTIMIZED

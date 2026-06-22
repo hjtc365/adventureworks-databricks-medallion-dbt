@@ -1,0 +1,22 @@
+resources:
+  jobs:
+    environment_pipeline:
+      name: environment-pipeline
+      tasks:
+        - task_key: bronze-bootstrap
+          run_job_task:
+            job_id: ${resources.jobs.bronze_bootstrap.id}
+            job_parameters:
+              catalog: adventureworks_{{job.parameters.environment}}
+        - task_key: run-dbt
+          depends_on:
+            - task_key: bronze-bootstrap
+          run_job_task:
+            job_id: ${resources.jobs.run_dbt.id}
+            job_parameters:
+              target: "{{job.parameters.environment}}"
+      queue:
+        enabled: true
+      parameters:
+        - name: environment
+          default: dev
