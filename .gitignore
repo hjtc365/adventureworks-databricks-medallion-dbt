@@ -1,9 +1,20 @@
+# Databricks
+.databricks/
 
+# dbt
 target/
 dbt_packages/
 logs/
 *.user.yml
-.venv/
+
+# IDE
 .vscode/
-.github/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.env
+
+# Scratch/experimental files not ready for the repo
 _others/
