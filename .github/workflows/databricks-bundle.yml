@@ -23,10 +23,10 @@ jobs:
     name: Validate Bundle
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Databricks CLI
-        uses: databricks/setup-cli@main
+        uses: databricks/setup-cli@v1.4.0
 
       - name: Validate bundle
         run: databricks bundle validate
@@ -44,10 +44,10 @@ jobs:
         startsWith(github.ref, 'refs/heads/bugfix/')  ||
         startsWith(github.ref, 'refs/heads/hotfix/'))
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Databricks CLI
-        uses: databricks/setup-cli@main
+        uses: databricks/setup-cli@v1.4.0
 
       - name: Deploy to Dev
         run: databricks bundle deploy -t dev
@@ -65,10 +65,10 @@ jobs:
       DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST_PROD }}
       DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN_PROD }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Databricks CLI
-        uses: databricks/setup-cli@main
+        uses: databricks/setup-cli@v1.4.0
 
       - name: Deploy to Prod
         run: databricks bundle deploy -t prod
