@@ -1,0 +1,17 @@
+bundle:
+  name: adventureworks-databricks-medallion-dbt
+
+include:
+  - resources/*.job.yml
+
+targets:
+  dev:
+    default: true
+    mode: development
+    workspace:
+      host: https://dbc-61f73fde-5699.cloud.databricks.com
+  prod:
+    mode: production
+    workspace:
+      host: https://dbc-61f73fde-5699.cloud.databricks.com
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}

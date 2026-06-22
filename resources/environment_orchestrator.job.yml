@@ -1,0 +1,19 @@
+resources:
+  jobs:
+    environment_orchestrator:
+      name: environment-orchestrator
+      tasks:
+        - task_key: load_envs
+          for_each_task:
+            inputs: "{{job.parameters.environments}}"
+            task:
+              task_key: load_envs_iteration
+              run_job_task:
+                job_id: ${resources.jobs.environment_pipeline.id}
+                job_parameters:
+                  environment: "{{input}}"
+      queue:
+        enabled: true
+      parameters:
+        - name: environments
+          default: '["dev", "prod"]'
