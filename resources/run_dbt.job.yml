@@ -5,7 +5,7 @@ resources:
       tasks:
         - task_key: run-dbt
           notebook_task:
-            notebook_path: /Workspace/Users/hjtc365@gmail.com/adventureworks-databricks-medallion-dbt/notebooks/run_dbt
+            notebook_path: /Workspace/Users/${workspace.current_user.userName}/adventureworks-databricks-medallion-dbt/notebooks/run_dbt
             source: WORKSPACE
       queue:
         enabled: true

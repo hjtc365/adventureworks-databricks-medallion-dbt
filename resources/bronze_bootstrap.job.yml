@@ -5,7 +5,7 @@ resources:
       tasks:
         - task_key: bronze-bootstrap
           notebook_task:
-            notebook_path: /Workspace/Users/hjtc365@gmail.com/adventureworks-databricks-medallion-dbt/notebooks/bronze_bootstrap
+            notebook_path: /Workspace/Users/${workspace.current_user.userName}/adventureworks-databricks-medallion-dbt/notebooks/bronze_bootstrap
             source: WORKSPACE
       queue:
         enabled: true
