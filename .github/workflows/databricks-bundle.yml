@@ -1,0 +1,118 @@
+name: Databricks Bundle CI/CD
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+
+  push:
+    branches:
+      - main
+      - develop
+      - "feature/**"
+      - "bugfix/**"
+      - "hotfix/**"
+
+jobs:
+  # --------------------------------------------------
+  # 1. VALIDATION (always runs)
+  # --------------------------------------------------
+  validate:
+    name: Validate Bundle
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install databricks-sdk
+
+      - name: Validate bundle
+        run: databricks bundle validate
+
+  # --------------------------------------------------
+  # 2. PREVIEW (feature / bugfix / hotfix)
+  # --------------------------------------------------
+  preview:
+    name: Preview Deploy (dev sandbox)
+    runs-on: ubuntu-latest
+    needs: validate
+    if: >
+      startsWith(github.ref, 'refs/heads/feature/') ||
+      startsWith(github.ref, 'refs/heads/bugfix/') ||
+      startsWith(github.ref, 'refs/heads/hotfix/')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install databricks-sdk
+
+      - name: Set preview target
+        id: env
+        run: |
+          SAFE_BRANCH=$(echo "${GITHUB_REF_NAME}" | tr '/' '-')
+          echo "bundle_target=dev-$SAFE_BRANCH" >> $GITHUB_OUTPUT
+
+      - name: Deploy preview
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST_DEV }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN_DEV }}
+        run: |
+          databricks bundle deploy -t "${{ steps.env.outputs.bundle_target }}"
+
+  # --------------------------------------------------
+  # 3. DEV DEPLOY (develop only)
+  # --------------------------------------------------
+  dev:
+    name: Deploy to Dev
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install databricks-sdk
+
+      - name: Deploy to Dev
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST_DEV }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN_DEV }}
+        run: databricks bundle deploy -t dev
+
+  # --------------------------------------------------
+  # 4. PROD DEPLOY (ONLY main)
+  # --------------------------------------------------
+  prod:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production # 🔒 approval gate required
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install databricks-sdk
+
+      - name: Deploy to Prod
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST_PROD }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN_PROD }}
+        run: databricks bundle deploy -t prod
