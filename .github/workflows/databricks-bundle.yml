@@ -15,6 +15,19 @@ on:
       - "hotfix/**"
 
 jobs:
+  - name: Debug auth
+    env:
+      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST_DEV }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN_DEV }}
+    run: |
+      echo "HOST=$DATABRICKS_HOST"
+      if [ -z "$DATABRICKS_TOKEN" ]; then
+        echo "TOKEN MISSING ❌"
+        exit 1
+      else
+        echo "TOKEN PRESENT ✅"
+      fi
+
   # --------------------------------------------------
   # 1. VALIDATION (always runs)
   # --------------------------------------------------
