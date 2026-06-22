@@ -1,0 +1,19 @@
+resources:
+  jobs:
+    run_dbt:
+      name: run-dbt
+      tasks:
+        - task_key: run-dbt
+          notebook_task:
+            notebook_path: /Workspace/Users/hjtc365@gmail.com/adventureworks-databricks-medallion-dbt/notebooks/run_dbt
+            source: WORKSPACE
+      queue:
+        enabled: true
+      parameters:
+        - name: target
+          default: dev
+      environments:
+        - environment_key: Default
+          spec:
+            environment_version: "5"
+      performance_target: PERFORMANCE_OPTIMIZED
