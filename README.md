@@ -91,6 +91,14 @@ adventureworks-databricks-medallion-dbt/
 │   ├── bronze_bootstrap.ipynb   # downloads CSVs → lands Bronze Delta tables
 │   ├── run_dbt.ipynb            # runs `dbt build` from a Databricks Job
 │   └── scd_data_generator.ipynb # mutates source rows to exercise SCD2
+├── databricks.yml           # Databricks Asset Bundle descriptor (4 jobs)
+├── resources/               # *.job.yml definitions globbed by the bundle
+├── .github/workflows/
+│   └── databricks-bundle.yml        # CI/CD: validate + deploy the bundle
+└── docs/
+    ├── databricks-jobs-ui.md           # wire the 4 jobs up by hand (Workflows UI)
+    ├── databricks-asset-bundle.md      # deploy the 4 jobs via the Databricks CLI
+    └── databricks-cicd-github-actions.md # GitHub Actions CI/CD design & setup
 ```
 
 ---
@@ -98,7 +106,7 @@ adventureworks-databricks-medallion-dbt/
 ## Prerequisites
 
 - A **Databricks Free Edition** account — sign up at <https://www.databricks.com/learn/free-edition>. You get a serverless SQL warehouse and Unity Catalog at no cost.
-- **Python 3.9 – 3.12** (3.11 recommended).
+- **Python 3.10 – 3.13** (3.12 recommended).
 - **Git**.
 - A terminal: **PowerShell** on Windows, or **bash/zsh** on macOS/Linux.
 
@@ -161,8 +169,8 @@ python --version
 python3 --version
 ```
 
-You want to see a Python version in the **3.9 - 3.12** range. If you already
-have **3.11.x**, keep it and move on.
+You want to see a Python version in the **3.10 - 3.13** range. If you already
+have **3.12.x**, keep it and move on.
 
 If Python is not installed:
 
@@ -175,16 +183,18 @@ If Python is not installed:
 **macOS**
 
 ```bash
-brew install python@3.11
-python3.11 --version
+brew install python@3.12
+echo 'export PATH="/opt/homebrew/opt/python@3.12/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+python3.12 --version
 ```
 
 **Ubuntu / Debian**
 
 ```bash
 sudo apt update
-sudo apt install python3.11 python3.11-venv
-python3.11 --version
+sudo apt install python3.12 python3.12-venv
+python3.12 --version
 ```
 
 If the version command works, Python is installed correctly and you can create
@@ -198,7 +208,7 @@ Python.
 **Windows PowerShell**
 
 ```powershell
-py -3.11 -m venv .venv
+py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
@@ -210,7 +220,7 @@ py -3.11 -m venv .venv
 **macOS / Linux**
 
 ```bash
-python3.11 -m venv .venv
+python3.12 -m venv .venv
 source .venv/bin/activate
 ```
 
@@ -427,131 +437,39 @@ flowchart TD
 | **environment-pipeline** | chains the two leaves for one env | bronze-bootstrap → run-dbt | `environment` (default `dev`) |
 | **environment-orchestrator** | fans the pipeline across all envs | environment-pipeline per env | `environments` (default `["dev", "prod"]`) |
 
-### How the parameters flow
-
-1. **environment-orchestrator** holds a JSON array parameter `environments`
-   (default `["dev", "prod"]`) and uses a **`for_each` task** to run
-   **environment-pipeline** once per element, passing each value through as
-   `environment = {{input}}`.
-2. **environment-pipeline** receives a single `environment` and runs the two
-   leaf jobs in order:
-   - **bronze-bootstrap** with `catalog = adventureworks_{{environment}}`
-   - **run-dbt** with `target = {{environment}}` (only after bronze-bootstrap
-     succeeds — see `depends_on`)
-3. The leaf jobs hand those values straight to the notebook widgets
-   (`catalog` and `target`), so the same notebooks serve every environment.
-
-This is why building both catalogs is one action: run
-**environment-orchestrator** and it loops `dev` then `prod`, each time
+Running **environment-orchestrator** once loops `dev` then `prod`, each time
 bootstrapping Bronze into `adventureworks_<env>` and then running
 `dbt build --target <env>`.
 
-> For CI/CD pipelines and repeatable deployments across workspaces, these four
-> jobs can also be defined as a **Databricks Asset Bundle** and deployed with
-> the Databricks CLI instead of the Workflows UI.
+There are two ways to create these four jobs — pick whichever fits your
+workflow:
 
-### Step 1 — Create the `aw` Databricks Secret scope
+| Approach | When to use it | Guide |
+|----------|----------------|-------|
+| **Workflows UI** | One-off setup, learning the moving parts, no CLI required | **[docs/databricks-jobs-ui.md](docs/databricks-jobs-ui.md)** |
+| **Databricks Asset Bundle** | Version-controlled, reproducible across workspaces, CI/CD | **[docs/databricks-asset-bundle.md](docs/databricks-asset-bundle.md)** |
 
-The `run_dbt` notebook reads five values from a Databricks Secret scope named
-`aw`. The scope must exist **before** any of the jobs run, otherwise the
-`run-dbt` task fails with `SecretNotFound`.
+Both produce the same jobs. The bundle is already defined in this repo
+([`databricks.yml`](databricks.yml) + [`resources/*.job.yml`](resources/)), so
+deploying it is just `databricks bundle deploy`. The bundle guide also covers
+authenticating the CLI with a `~/.databrickscfg` **host + token** profile as an
+alternative to browser-based OAuth login.
 
-You need the **v0.205+ Databricks CLI** for this (the new Go-based CLI, not
-the legacy `pip install databricks-cli` package). Install once:
+> Both approaches run the `run_dbt` notebook, which reads its credentials from a
+> Databricks Secret scope named `aw`. Creating that scope is **Step 1** in each
+> guide and must be done before the jobs run.
 
-```bash
-# Windows
-winget install Databricks.DatabricksCLI
+### Continuous deployment with GitHub Actions
 
-# macOS
-brew tap databricks/tap && brew install databricks
+The repo also ships a CI/CD pipeline
+([`.github/workflows/databricks-bundle.yml`](.github/workflows/databricks-bundle.yml))
+that **validates the bundle on every pull request** and **auto-deploys** it with
+the Databricks CLI — to **dev** on pushes to `feature/`, `bugfix/`, or `hotfix/`
+branches, and to **prod** (behind a manual approval gate) on merges to `main`.
 
-# Linux / other
-curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
-```
-
-Authenticate against your workspace (opens a browser):
-
-```bash
-databricks auth login --host https://dbc-xxxxxxxx-xxxx.cloud.databricks.com
-```
-
-Create the scope and populate the five keys. Values are sent over TLS and
-never echoed back to the terminal.
-
-```bash
-databricks secrets create-scope aw
-
-databricks secrets put-secret aw host       --string-value "dbc-xxxxxxxx-xxxx.cloud.databricks.com"
-databricks secrets put-secret aw http_path  --string-value "/sql/1.0/warehouses/abc123def456"
-databricks secrets put-secret aw dbt_token  --string-value "dapiXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-databricks secrets put-secret aw dbt_user   --string-value "<your-dbt-user-prefix>"
-```
-
-Verify:
-
-```bash
-databricks secrets list-scopes
-databricks secrets list-secrets aw   # should list: host, http_path, dbt_token, dbt_user
-```
-
-| Secret key | Value to supply |
-|------------|-----------------|
-| `host` | Workspace **Server hostname** — no `https://`, no trailing `/` |
-| `http_path` | SQL Warehouse **HTTP path** from **Connection details** |
-| `dbt_token` | Your Databricks **Personal Access Token** (`dapi…`) |
-| `dbt_user` | Your dbt user prefix — the `generate_schema_name` macro uses this to isolate dev schemas (e.g. `alice` → `alice_silver`, `alice_gold`) |
-
-### Step 2 — Clone the repo as a Databricks Git folder
-
-Databricks now recommends creating Git folders from your **home folder** rather
-than under the legacy `/Repos` path:
-
-1. In the workspace UI, navigate to **Workspace → Home**.
-2. Click **Create → Git folder** (top-right button).
-3. Paste the HTTPS URL of your fork:
-   `https://github.com/<your-github-username>/adventureworks-databricks-medallion-dbt.git`
-4. Leave the folder name as-is and click **Create Git folder**.
-
-This clones the repo under
-`/Workspace/Users/<you>@example.com/adventureworks-databricks-medallion-dbt`,
-which is the path used in the `notebook_path` values below — adjust them if
-you chose a different location.
-
-> The legacy path **Workspace → Repos → Add repo** still works if you prefer
-> it; your folder will be visible under `/Workspace/Repos/<you>@example.com/`
-> instead.
-
-### Step 3 — Build the four jobs in the Workflows UI
-
-Create the jobs **bottom-up** so each parent can pick its children's job IDs
-from the dropdown:
-
-1. **bronze-bootstrap** — new Job → single **Notebook** task pointing at
-   `notebooks/bronze_bootstrap`. Add a job parameter `catalog` =
-   `adventureworks_dev`.
-2. **run-dbt** — new Job → single **Notebook** task pointing at
-   `notebooks/run_dbt`. Add a job parameter `target` = `dev`. Use a bare
-   serverless environment — **do not** add `dbt-databricks` as a job
-   dependency. The notebook installs its own pinned version via
-   `%pip install "dbt-databricks==1.12.*"` and restarts Python, so declaring it
-   at the job level is redundant and risks a version mismatch.
-3. **environment-pipeline** — new Job with two **Run Job** tasks:
-   - `bronze-bootstrap` → run the bronze-bootstrap job with
-     `catalog = adventureworks_{{job.parameters.environment}}`.
-   - `run-dbt` → **depends on** `bronze-bootstrap`, runs the run-dbt job with
-     `target = {{job.parameters.environment}}`.
-   - Add a job parameter `environment` = `dev`.
-4. **environment-orchestrator** — new Job with one **For each** task whose
-   input is `{{job.parameters.environments}}`; the nested task is a **Run Job**
-   on environment-pipeline with `environment = {{input}}`. Add a job parameter
-   `environments` = `["dev", "prod"]`.
-
-### Step 4 — Run
-
-Run **environment-orchestrator** to load `dev` and `prod` in one go, or run
-**environment-pipeline** with `environment=dev` (or `prod`) to load a single
-environment.
+See **[docs/databricks-cicd-github-actions.md](docs/databricks-cicd-github-actions.md)**
+for the design, the branching model, and how to configure the required GitHub
+secrets and the `production` approval environment.
 
 ---
 
