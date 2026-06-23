@@ -11,10 +11,6 @@ on:
       - "bugfix/**"
       - "hotfix/**"
 
-env:
-  DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST_DEV }}
-  DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN_DEV }}
-
 jobs:
   # --------------------------------------------------
   # 1. VALIDATION (always runs)
@@ -28,8 +24,17 @@ jobs:
       - name: Set up Databricks CLI
         uses: databricks/setup-cli@v1.4.0
 
+      # The bundle's dev target uses `profile: dev`, so the CLI needs a
+      # matching [dev] profile in ~/.databrickscfg. Write it from secrets.
+      - name: Write dev profile
+        run: |
+          umask 077
+          printf '[dev]\nhost = %s\ntoken = %s\n' \
+            '${{ secrets.DATABRICKS_HOST_DEV }}' \
+            '${{ secrets.DATABRICKS_TOKEN_DEV }}' > ~/.databrickscfg
+
       - name: Validate bundle
-        run: databricks bundle validate
+        run: databricks bundle validate -t dev
 
   # --------------------------------------------------
   # 2. DEV DEPLOY (feature / bugfix / hotfix)
@@ -49,6 +54,13 @@ jobs:
       - name: Set up Databricks CLI
         uses: databricks/setup-cli@v1.4.0
 
+      - name: Write dev profile
+        run: |
+          umask 077
+          printf '[dev]\nhost = %s\ntoken = %s\n' \
+            '${{ secrets.DATABRICKS_HOST_DEV }}' \
+            '${{ secrets.DATABRICKS_TOKEN_DEV }}' > ~/.databrickscfg
+
       - name: Deploy to Dev
         run: databricks bundle deploy -t dev
 
@@ -61,14 +73,20 @@ jobs:
     needs: validate
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment: production # 🔒 approval gate required
-    env:
-      DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST_PROD }}
-      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN_PROD }}
     steps:
       - uses: actions/checkout@v7
 
       - name: Set up Databricks CLI
         uses: databricks/setup-cli@v1.4.0
+
+      # The bundle's prod target uses `profile: prod`, so write a matching
+      # [prod] profile from the prod secrets.
+      - name: Write prod profile
+        run: |
+          umask 077
+          printf '[prod]\nhost = %s\ntoken = %s\n' \
+            '${{ secrets.DATABRICKS_HOST_PROD }}' \
+            '${{ secrets.DATABRICKS_TOKEN_PROD }}' > ~/.databrickscfg
 
       - name: Deploy to Prod
         run: databricks bundle deploy -t prod
