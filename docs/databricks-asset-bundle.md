@@ -132,6 +132,10 @@ databricks current-user me -p prod      # uses the [prod] profile
 > the repo, and holds live tokens. Rotate a token in Databricks if it ever
 > leaks.
 
+> Prefer to keep workspace URLs *in* the repo? Replace each target's `profile:`
+> with a `host:` line in `databricks.yml` instead — both are valid. This project
+> uses `profile:` so the URLs stay local.
+
 ### Option B — OAuth user-to-machine (U2M)
 
 The CLI opens a browser, you log in once, and a short-lived token is cached
